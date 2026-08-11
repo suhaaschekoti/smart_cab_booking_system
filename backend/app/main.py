@@ -1,6 +1,4 @@
 from fastapi import FastAPI, Depends
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from app.database import get_db
 
@@ -13,10 +11,17 @@ def root():
 
 
 @app.get("/health/db")
-def db_health_check(db: Session = Depends(get_db)):
+def db_health_check(db=Depends(get_db)):
     """Quick check that the API can actually reach Postgres."""
-    db.execute(text("SELECT 1"))
-    return {"database": "connected"}
+    db.execute("SELECT 1 AS ok")
+    return db.fetchone()
+
+
+@app.get("/attractions")
+def list_attractions(db=Depends(get_db)):
+    """Example raw-SQL route -- tour guide feature, list all attractions."""
+    db.execute("SELECT * FROM attractions ORDER BY name")
+    return db.fetchall()
 
 
 # Routers for each module get included here as they're built, e.g.:

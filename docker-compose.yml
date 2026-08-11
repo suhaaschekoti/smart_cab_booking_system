@@ -13,7 +13,18 @@ services:
       - "5432:5432"
     volumes:
       - smart_cab_pgdata:/var/lib/postgresql/data
-      - ./db/smart_cab_db_schema.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+
+  backend:
+    build: ./backend
+    container_name: smart_cab_backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
 
 volumes:
   smart_cab_pgdata:
