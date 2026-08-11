@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: smart_cab_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: smart_cab_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - smart_cab_pgdata:/var/lib/postgresql/data
+      - ./db/smart_cab_db_schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  smart_cab_pgdata:
