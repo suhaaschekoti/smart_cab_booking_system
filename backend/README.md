@@ -1,6 +1,6 @@
 # Backend — Smart Cab Booking System API
 
-FastAPI service, raw SQL via `psycopg2` (no ORM).
+FastAPI service using SQLAlchemy ORM (Postgres via `psycopg2` driver).
 
 ## Structure
 ```
@@ -8,11 +8,13 @@ backend/
 ├── app/
 │   ├── main.py         # entrypoint + routes
 │   ├── config.py       # env-based settings
-│   ├── database.py     # psycopg2 connection pool + get_db dependency
+│   ├── database.py     # SQLAlchemy engine/session + get_db dependency
+│   ├── models.py        # ORM models -- one class per table, matches migrations/0001_initial_schema.sql
+│   ├── schemas.py       # Pydantic schemas for request/response validation (separate from ORM models)
 │   └── routers/         # per-module route files go here as they're built
-├── migrations/          # numbered SQL migrations, source of truth for schema
+├── migrations/          # numbered SQL files, source of truth for the actual schema
 ├── scripts/
-│   └── seed_db.py       # populates test data for local dev/demo
+│   └── seed_db.py       # populates test data for local dev/demo (raw psycopg2, standalone script)
 ├── .env.example
 ├── Dockerfile
 ├── Makefile
@@ -52,9 +54,19 @@ Add a router file under `app/routers/`, then include it in `app/main.py`:
 from app.routers import trips
 app.include_router(trips.router, prefix="/trips", tags=["trips"])
 ```
-Keep queries parameterized (`%s` placeholders) — never string-format raw SQL.
+Query via the ORM (`db: Session = Depends(get_db)`), e.g.:
+```python
+db.query(models.Trip).filter(models.Trip.user_id == user_id).all()
+```
+Always set `response_model=` on routes returning ORM objects (a matching
+`schemas.py` class with `from_attributes = True`) — FastAPI can't
+serialize raw SQLAlchemy model instances directly.
 
 ## Changing the schema
-Add a new numbered file to `migrations/` (see `migrations/README.md`)
-rather than editing `0001_initial_schema.sql` directly, once it's been
-applied anywhere.
+Two things need to stay in sync when you change the schema:
+1. Add a new numbered file to `migrations/` (see `migrations/README.md`)
+   — this is what actually runs against Postgres.
+2. Update the matching class in `app/models.py` to reflect the change.
+
+`models.py` is not auto-generated from the SQL files — keep them in sync
+by hand, or consider adding Alembic later if this becomes error-prone.
