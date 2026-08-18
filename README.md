@@ -6,8 +6,9 @@ with Passenger, Driver, and Admin roles.
 ## Tech Stack
 - **Backend**: FastAPI (Python) — SQLAlchemy ORM, Postgres
 - **Frontend**: React + Vite (JavaScript)
-- **Database**: PostgreSQL (local via Docker for now, Supabase later)
-- **Realtime**: Socket.io (for simulated live driver location)
+- **Database**: PostgreSQL (local via Docker for now, Supabase later) — host port `5441`
+- **Auth**: JWT, role embedded in the token, separate login per role
+- **Realtime**: Socket.io (for simulated live driver location) — not yet implemented
 
 ## Project Structure
 ```
@@ -21,6 +22,7 @@ smart_cab_booking_system/
 │   │   ├── schemas.py
 │   │   ├── auth.py
 │   │   └── routers/
+│   │       └── auth.py
 │   ├── migrations/                 # numbered SQL files, source of truth for schema
 │   ├── scripts/
 │   │   └── seed_db.py
@@ -33,24 +35,31 @@ smart_cab_booking_system/
 ├── frontend/                      # React app — see frontend/README.md
 │   ├── src/
 │   │   ├── api/
+│   │   │   ├── client.js
+│   │   │   └── auth.js
 │   │   ├── pages/
+│   │   │   ├── Login.jsx
+│   │   │   └── Register.jsx
 │   │   ├── App.jsx
-│   │   └── main.jsx
+│   │   ├── main.jsx
+│   │   └── index.css
 │   ├── index.html
 │   ├── package.json
 │   └── .env.example
-├── docker-compose.yml              # orchestrates Postgres + backend together
+├── docker-compose.yml              # orchestrates Postgres + backend, live-reload mounted
 ├── .gitattributes
 └── .gitignore
 ```
 
 ## Quick Start
 
-**Backend** (see [`backend/README.md`](./backend/README.md) for full detail):
+**Everything backend-related** (Postgres + API, live-reload on code changes):
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
-Then check `http://localhost:8000/health/db`.
+First run only needs `--build`; after that, plain `docker compose up -d`
+picks up your code edits automatically (see `backend/README.md` for how
+this works). Check `http://localhost:8000/health/db`.
 
 **Frontend** (see [`frontend/README.md`](./frontend/README.md) for full detail):
 ```bash
@@ -61,9 +70,12 @@ npm run dev
 ```
 Opens at `http://localhost:5173`.
 
-**Try it end-to-end**: seed test accounts (`cd backend && make seed`),
-open the frontend, and log in as Passenger with `suhaas@example.com` /
-`password123`.
+**Try it end-to-end**:
+1. Seed test accounts: `cd backend && python scripts/seed_db.py`
+   (all seeded accounts use password `password123`)
+2. Open `http://localhost:5173/login`, log in as Passenger with
+   `suhaas@example.com` / `password123`
+3. Or try `/register` to create a fresh account for any of the 3 roles
 
 ## Switching to Supabase (later)
 1. Create the Supabase project and run each file in `backend/migrations/`,
@@ -75,6 +87,15 @@ open the frontend, and log in as Passenger with `suhaas@example.com` /
 - **Passenger module** (auth, booking, trip view) — Member A
 - **Driver module** (dashboard, accept/reject, live location) — Member B
 - **Admin module** (user/driver management, payments, ratings, alerts) — Member C
+
+## Progress So Far
+- [x] Database schema (13 tables, incl. driver-rental + tour guide additions)
+- [x] Local Postgres via Docker, with live-reloading backend
+- [x] Auth: register + login for all 3 roles (User/Driver/Admin), JWT-based
+- [x] Frontend: Login + Register pages, role-tabbed, wired to the real API
+- [ ] Booking flow (trip request, driver matching, trip lifecycle) — next up
+- [ ] Payments, feedback, emergency alerts, rewards
+- [ ] Driver + Admin dashboards
 
 ## Scope Notes
 - Driver-to-passenger matching uses straight-line (Haversine) distance, not real routing/traffic-aware ETA.

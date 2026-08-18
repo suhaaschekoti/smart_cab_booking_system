@@ -8,10 +8,11 @@ frontend/
 ├── src/
 │   ├── api/
 │   │   ├── client.js     # axios instance, reads VITE_API_URL
-│   │   └── auth.js       # login/session helpers for the 3 roles
+│   │   └── auth.js       # login/register/session helpers for the 3 roles
 │   ├── pages/
-│   │   └── Login.jsx     # role-tabbed login (Passenger/Driver/Admin)
-│   ├── App.jsx
+│   │   ├── Login.jsx     # role-tabbed login (Passenger/Driver/Admin)
+│   │   └── Register.jsx  # role-tabbed registration, fields adjust per role
+│   ├── App.jsx            # react-router-dom routes: /login, /register
 │   ├── main.jsx
 │   └── index.css
 ├── index.html
@@ -29,16 +30,14 @@ npm run dev
 ```
 Opens at `http://localhost:5173`.
 
-Make sure the backend is running first (`docker compose up -d --build`
-from the project root, or `make run` inside `backend/`) — the backend
-also needs CORS configured to allow `localhost:5173`, which is already
-set up in `backend/app/main.py`.
+Make sure the backend is running first (`docker compose up -d` from the
+project root) — the backend also needs CORS configured to allow
+`localhost:5173`, which is already set up in `backend/app/main.py`.
 
 ## Testing login
-1. Seed test accounts on the backend: `cd backend && make seed` (or
-   `python scripts/seed_db.py` on Windows without `make`)
+1. Seed test accounts on the backend: `cd backend && python scripts/seed_db.py`
    (all seeded accounts use password `password123`)
-2. Open `http://localhost:5173`
+2. Open `http://localhost:5173/login`
 3. Pick a role tab, log in with a seeded account
    (e.g. Passenger: `suhaas@example.com` / `password123`)
 4. On success, the page shows the token and calls `/users/me` to prove
@@ -59,7 +58,6 @@ harden it later, httpOnly cookies are the more secure alternative,
 but require backend changes too.
 
 ## Next steps
-- Add `react-router-dom` (already in `package.json`) once there's more
-  than one page — role-based dashboards (Passenger/Driver/Admin) would
-  each get their own route, gated by `getSession().role`.
-- Add a registration page/form, wired to `/auth/{role}/register`.
+- Passenger/Driver/Admin dashboards, each their own route, gated by
+  `getSession().role` (redirect to `/login` if missing or wrong role).
+- Booking flow UI once the backend `/trips` endpoints exist.

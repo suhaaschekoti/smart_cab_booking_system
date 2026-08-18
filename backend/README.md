@@ -11,42 +11,78 @@ backend/
 │   ├── database.py     # SQLAlchemy engine/session + get_db dependency
 │   ├── models.py        # ORM models -- one class per table, matches migrations/0001_initial_schema.sql
 │   ├── schemas.py       # Pydantic schemas for request/response validation (separate from ORM models)
-│   └── routers/         # per-module route files go here as they're built
+│   ├── auth.py          # password hashing + JWT create/decode
+│   └── routers/
+│       └── auth.py      # register/login for all 3 roles
 ├── migrations/          # numbered SQL files, source of truth for the actual schema
 ├── scripts/
 │   └── seed_db.py       # populates test data for local dev/demo (raw psycopg2, standalone script)
 ├── .env.example
 ├── Dockerfile
-├── Makefile
+├── Makefile              # Unix/Mac only -- see Windows notes below
 ├── requirements.txt
 └── start.sh
 ```
 
-## Setup (local dev, without Docker)
+## Local Postgres port
+Docker's Postgres is mapped to **host port 5441** (not the default 5432),
+to avoid conflicting with any native Postgres install on your machine.
+`backend/.env`'s `DATABASE_URL` should read:
+```
+DATABASE_URL=postgresql://postgres:postgres@localhost:5441/smart_cab_db
+```
+(This is the host-side value, used when running Python directly on your
+machine. The backend container itself uses a different internal address
+— `db:5432` — set directly in `docker-compose.yml`; you don't need to
+touch that separately.)
+
+## Setup (Docker — recommended day-to-day)
+From the project root:
+```bash
+docker compose up -d
+```
+First time only, or after changing `requirements.txt`/`Dockerfile`, add `--build`.
+Your local `backend/app/` is mounted into the container and uvicorn runs
+with `--reload`, so code edits take effect immediately — no rebuild needed
+for ordinary code changes.
+
+## Setup (local dev, without Docker for the backend)
+Useful if you'd rather run uvicorn natively. Keep Postgres in Docker either way:
+```bash
+docker compose up -d db
+```
+Then:
 ```bash
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+# Windows: .venv\Scripts\activate
+# Mac/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env           # fill in JWT_SECRET_KEY etc.
 uvicorn app.main:app --reload
 ```
-Or with the Makefile:
-```bash
-make install
-make run
+
+**On Windows, `make` isn't available by default** — run the underlying
+commands directly instead of `make install` / `make run` / `make seed`:
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+python scripts/seed_db.py
 ```
 
-## Setup (Docker)
-From the project root:
-```bash
-docker compose up -d --build
-```
-This starts both Postgres and the backend API together.
+## Known gotcha: bcrypt version
+`requirements.txt` pins `bcrypt==4.0.1` deliberately — newer bcrypt
+releases (4.1+) break compatibility with `passlib` 1.7.4 (a missing
+`__about__` attribute causes password hashing to fail with a confusing
+"password cannot be longer than 72 bytes" error). Don't upgrade bcrypt
+without also upgrading passlib and retesting.
 
 ## Seeding test data
 ```bash
-make seed
+python scripts/seed_db.py
 ```
+(or `make seed` on Mac/Linux). All seeded accounts use password `password123`.
 
 ## Auth
 Three separate roles, each with its own register/login endpoints and JWT:
@@ -58,33 +94,6 @@ Each login returns a JWT (`access_token`) embedding the role, so a user's
 token can't be used to call driver/admin-only routes. To protect a new
 route, add the matching dependency:
 ```python
-from app.routers import auth
-
-@router.get("/my-trips")
-def my_trips(current_user: models.User = Depends(auth.get_current_user)):
-    ...
-```
-Equivalent dependencies: `auth.get_current_driver`, `auth.get_current_admin`.
-
-Test it via `/docs` — use the "Authorize" button after logging in through
-the matching login route, or call `/auth/user/login` directly and pass
-the returned token as a `Bearer` header on subsequent requests.
-
-Seeded accounts (after `make seed`) all use password `password123`.
-
-## Adding a new route
-Add a router file under `app/routers/`, then include it in `app/main.py`:
-```python
-from app.routers import trips
-app.include_router(trips.router, prefix="/trips", tags=["trips"])
-```
-Query via the ORM (`db: Session = Depends(get_db)`), e.g.:
-```python
-db.query(models.Trip).filter(models.Trip.user_id == user_id).all()
-```
-Always set `response_model=` on routes returning ORM objects (a matching
-`schemas.py` class with `from_attributes = True`) — FastAPI can't
-serialize raw SQLAlchemy model instances directly.
 
 ## Changing the schema
 Two things need to stay in sync when you change the schema:
