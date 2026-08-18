@@ -4,8 +4,8 @@ A B.Tech group project (3-person team) implementing a Smart Cab Booking System
 with Passenger, Driver, and Admin roles.
 
 ## Tech Stack
-- **Backend**: FastAPI (Python) — raw SQL via `psycopg2`, no ORM
-- **Frontend**: React
+- **Backend**: FastAPI (Python) — SQLAlchemy ORM, Postgres
+- **Frontend**: React + Vite (JavaScript)
 - **Database**: PostgreSQL (local via Docker for now, Supabase later)
 - **Realtime**: Socket.io (for simulated live driver location)
 
@@ -17,6 +17,9 @@ smart_cab_booking_system/
 │   │   ├── main.py
 │   │   ├── config.py
 │   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── auth.py
 │   │   └── routers/
 │   ├── migrations/                 # numbered SQL files, source of truth for schema
 │   ├── scripts/
@@ -27,19 +30,40 @@ smart_cab_booking_system/
 │   ├── README.md
 │   ├── requirements.txt
 │   └── start.sh
-├── frontend/                      # React app (to be added)
+├── frontend/                      # React app — see frontend/README.md
+│   ├── src/
+│   │   ├── api/
+│   │   ├── pages/
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── index.html
+│   ├── package.json
+│   └── .env.example
 ├── docker-compose.yml              # orchestrates Postgres + backend together
 ├── .gitattributes
 └── .gitignore
 ```
 
 ## Quick Start
-See [`backend/README.md`](./backend/README.md) for full backend setup
-(local venv or Docker). Short version, from the project root:
+
+**Backend** (see [`backend/README.md`](./backend/README.md) for full detail):
 ```bash
 docker compose up -d --build
 ```
 Then check `http://localhost:8000/health/db`.
+
+**Frontend** (see [`frontend/README.md`](./frontend/README.md) for full detail):
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+Opens at `http://localhost:5173`.
+
+**Try it end-to-end**: seed test accounts (`cd backend && make seed`),
+open the frontend, and log in as Passenger with `suhaas@example.com` /
+`password123`.
 
 ## Switching to Supabase (later)
 1. Create the Supabase project and run each file in `backend/migrations/`,
@@ -61,3 +85,5 @@ Then check `http://localhost:8000/health/db`.
   (a driver comes to drive the passenger's own vehicle — e.g. drunk pickup, errands),
   and `TOUR` (ride to a suggested attraction). See `backend/migrations/0001_initial_schema.sql`
   for the exact constraint logic on which vehicle field applies to each type.
+- Auth uses JWTs with the role embedded, issued via separate login endpoints
+  per role (`/auth/user/login`, `/auth/driver/login`, `/auth/admin/login`).

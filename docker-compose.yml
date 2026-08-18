@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16
@@ -10,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: smart_cab_db
     ports:
-      - "5432:5432"
+      - "5441:5432"
     volumes:
       - smart_cab_pgdata:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d
@@ -23,6 +21,12 @@ services:
       - db
     env_file:
       - ./backend/.env
+    environment:
+      # Overrides whatever DATABASE_URL is in .env -- inside Docker's
+      # internal network the backend reaches Postgres via the service
+      # name "db" on its internal port 5432, regardless of which host
+      # port we've mapped Postgres to (5441).
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/smart_cab_db
     ports:
       - "8000:8000"
 

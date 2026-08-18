@@ -48,6 +48,30 @@ This starts both Postgres and the backend API together.
 make seed
 ```
 
+## Auth
+Three separate roles, each with its own register/login endpoints and JWT:
+- `POST /auth/user/register`, `POST /auth/user/login`
+- `POST /auth/driver/register`, `POST /auth/driver/login`
+- `POST /auth/admin/register`, `POST /auth/admin/login`
+
+Each login returns a JWT (`access_token`) embedding the role, so a user's
+token can't be used to call driver/admin-only routes. To protect a new
+route, add the matching dependency:
+```python
+from app.routers import auth
+
+@router.get("/my-trips")
+def my_trips(current_user: models.User = Depends(auth.get_current_user)):
+    ...
+```
+Equivalent dependencies: `auth.get_current_driver`, `auth.get_current_admin`.
+
+Test it via `/docs` — use the "Authorize" button after logging in through
+the matching login route, or call `/auth/user/login` directly and pass
+the returned token as a `Bearer` header on subsequent requests.
+
+Seeded accounts (after `make seed`) all use password `password123`.
+
 ## Adding a new route
 Add a router file under `app/routers/`, then include it in `app/main.py`:
 ```python
