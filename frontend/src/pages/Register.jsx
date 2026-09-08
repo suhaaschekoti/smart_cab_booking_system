@@ -8,6 +8,9 @@ const ROLES = [
   { key: "admin", label: "Admin" },
 ];
 
+const VEHICLE_TYPES = ["Hatchback", "Sedan", "SUV"];
+const FUEL_TYPES = ["Petrol", "Diesel", "EV", "CNG"];
+
 const EMPTY_FORM = {
   name: "",
   email: "",
@@ -15,6 +18,9 @@ const EMPTY_FORM = {
   password: "",
   gender: "",
   license_number: "",
+  vehicle_number: "",
+  vehicle_type: "",
+  fuel_type: "",
   username: "",
 };
 
@@ -53,6 +59,9 @@ export default function Register() {
         phone: form.phone,
         password: form.password,
         license_number: form.license_number,
+        vehicle_number: form.vehicle_number,
+        vehicle_type: form.vehicle_type || null,
+        fuel_type: form.fuel_type || null,
       };
     }
     // admin
@@ -89,7 +98,9 @@ export default function Register() {
             <div className="success-icon">&#10003;</div>
             <p style={{ margin: "0 0 4px 0", fontWeight: 600 }}>Account created</p>
             <p style={{ margin: "0 0 20px 0", color: "var(--text-dim)", fontSize: 13 }}>
-              You can now log in as {ROLES.find((r) => r.key === role).label}.
+              {role === "admin"
+                ? `You can now log in as ${ROLES.find((r) => r.key === role).label}.`
+                : "Check your email for a verification link before logging in."}
             </p>
             <button className="submit-btn" onClick={() => navigate("/login")}>
               Go to login
@@ -177,16 +188,54 @@ export default function Register() {
           )}
 
           {role === "driver" && (
-            <div className="field">
-              <label>Driving license number</label>
-              <input
-                type="text"
-                value={form.license_number}
-                onChange={(e) => update("license_number", e.target.value)}
-                placeholder="DL-0001"
-                required
-              />
-            </div>
+            <>
+              <div className="field">
+                <label>Driving license number</label>
+                <input
+                  type="text"
+                  value={form.license_number}
+                  onChange={(e) => update("license_number", e.target.value)}
+                  placeholder="DL-0001"
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>Vehicle number</label>
+                <input
+                  type="text"
+                  value={form.vehicle_number}
+                  onChange={(e) => update("vehicle_number", e.target.value)}
+                  placeholder="KL-07-AB-1234"
+                  required
+                />
+              </div>
+              <div className="form-grid">
+                <div className="field">
+                  <label>Vehicle type</label>
+                  <select
+                    value={form.vehicle_type}
+                    onChange={(e) => update("vehicle_type", e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    {VEHICLE_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Fuel type</label>
+                  <select
+                    value={form.fuel_type}
+                    onChange={(e) => update("fuel_type", e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    {FUEL_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
           )}
 
           {role === "user" && (

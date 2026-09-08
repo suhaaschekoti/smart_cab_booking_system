@@ -19,6 +19,7 @@ class User(Base):
     reward_points = Column(Integer, default=0)
     safety_mode_enabled = Column(Boolean, default=False)
     is_flagged = Column(Boolean, default=False)
+    is_verified = Column(Boolean, default=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     trips = relationship("Trip", back_populates="user")
@@ -40,6 +41,7 @@ class Driver(Base):
     incentive_score = Column(DECIMAL(6, 2), default=0)
     current_lat = Column(DECIMAL(9, 6))
     current_lng = Column(DECIMAL(9, 6))
+    is_verified = Column(Boolean, default=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     vehicles = relationship("Vehicle", back_populates="driver")
@@ -123,11 +125,15 @@ class Trip(Base):
     end_time = Column(TIMESTAMP)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
+    # Matches migrations/0002_relax_trip_vehicle_check.sql -- the vehicle
+    # consistency rule only applies once a driver is actually assigned;
+    # an unmatched trip (driver_id IS NULL) can have both vehicle fields null.
     __table_args__ = (
         CheckConstraint(
+            "(driver_id IS NULL) OR "
             "(service_type IN ('RIDE', 'TOUR') AND vehicle_id IS NOT NULL AND user_vehicle_id IS NULL) OR "
             "(service_type = 'DRIVER_RENTAL' AND user_vehicle_id IS NOT NULL AND vehicle_id IS NULL)",
-            name="trip_service_type_vehicle_check",
+            name="trips_check",
         ),
     )
 

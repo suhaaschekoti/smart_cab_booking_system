@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models, schemas
-from app.routers import auth
+from app.routers import auth, trips, drivers
 
 app = FastAPI(title="Smart Cab Booking System API")
 
@@ -20,6 +20,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(trips.router, prefix="/trips", tags=["trips"])
+app.include_router(drivers.router, prefix="/drivers", tags=["drivers"])
 
 
 @app.get("/")
@@ -52,5 +54,5 @@ def get_my_profile(current_user: models.User = Depends(auth.get_current_user)):
 
 
 # More routers get included here as they're built, e.g.:
-# from app.routers import trips
-# app.include_router(trips.router, prefix="/trips", tags=["trips"])
+# from app.routers import payments
+# app.include_router(payments.router, prefix="/payments", tags=["payments"])

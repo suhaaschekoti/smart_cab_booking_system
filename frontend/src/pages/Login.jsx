@@ -1,12 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import {
-  login,
-  saveSession,
-  getSession,
-  clearSession,
-  fetchCurrentUser,
-} from "../api/auth";
+import { Link, useNavigate } from "react-router-dom";
+import { login, saveSession, getSession, clearSession } from "../api/auth";
 
 const ROLES = [
   { key: "user", label: "Passenger" },
@@ -14,27 +8,27 @@ const ROLES = [
   { key: "admin", label: "Admin" },
 ];
 
+const DASHBOARD_ROUTES = {
+  user: "/dashboard",
+  driver: "/driver/dashboard",
+};
+
 export default function Login() {
+  const navigate = useNavigate();
   const [role, setRole] = useState("user");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState(getSession());
-  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    // If already logged in as a passenger, fetch their profile to prove
-    // the token actually works end-to-end (GET /users/me is protected).
-    if (session?.role === "user") {
-      fetchCurrentUser(session.token)
-        .then(setProfile)
-        .catch(() => {
-          clearSession();
-          setSession(null);
-        });
+    if (!session) return;
+    const dest = DASHBOARD_ROUTES[session.role];
+    if (dest) {
+      navigate(dest, { replace: true });
     }
-  }, [session]);
+  }, [session, navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -55,12 +49,12 @@ export default function Login() {
   function handleLogout() {
     clearSession();
     setSession(null);
-    setProfile(null);
     setIdentifier("");
     setPassword("");
   }
 
-  if (session) {
+  // Admin: no dashboard yet -- show debug success screen
+  if (session && session.role === "admin") {
     return (
       <div className="page">
         <div className="auth-card">
@@ -79,15 +73,9 @@ export default function Login() {
               <strong>Token (first 40 chars):</strong>
               <br />
               {session.token.slice(0, 40)}...
-              {profile && (
-                <>
-                  <br />
-                  <br />
-                  <strong>/users/me response:</strong>
-                  <br />
-                  {profile.name} &middot; {profile.email}
-                </>
-              )}
+              <br />
+              <br />
+              <em>No dashboard built yet for this role — coming soon.</em>
             </div>
 
             <button className="logout-btn" onClick={handleLogout}>
@@ -148,6 +136,13 @@ export default function Login() {
               placeholder="••••••••"
               required
             />
+            {role !== "admin" && (
+              <div style={{ textAlign: "right", marginTop: 6 }}>
+                <Link to="/forgot-password" style={{ color: "var(--text-dim)", fontSize: 12 }}>
+                  Forgot password?
+                </Link>
+              </div>
+            )}
           </div>
           <button className="submit-btn" type="submit" disabled={loading}>
             {loading ? "Signing in..." : `Sign in as ${ROLES.find((r) => r.key === role).label}`}

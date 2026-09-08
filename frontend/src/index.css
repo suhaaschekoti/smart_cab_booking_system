@@ -137,7 +137,8 @@ body {
   margin-bottom: 6px;
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   padding: 11px 12px;
   border-radius: 8px;
@@ -148,7 +149,8 @@ body {
   font-family: var(--font-body);
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -235,4 +237,441 @@ body {
 .logout-btn:hover {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+/* ---------------- Dashboard ---------------- */
+
+.dashboard-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-user {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.logout-btn-small {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.logout-btn-small:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.dashboard-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 24px 64px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 18px 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.form-grid .field {
+  grid-column: span 1;
+}
+
+.form-grid .field:nth-child(1),
+.form-grid .field:nth-child(2) {
+  grid-column: span 2;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: -8px 0 16px 0;
+}
+
+.empty-state {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-requested {
+  background: rgba(244, 185, 66, 0.15);
+  color: var(--accent);
+}
+
+.status-accepted {
+  background: rgba(93, 156, 236, 0.15);
+  color: #5d9cec;
+}
+
+.status-ongoing {
+  background: rgba(244, 185, 66, 0.25);
+  color: var(--accent);
+}
+
+.status-completed {
+  background: rgba(76, 175, 125, 0.15);
+  color: var(--success);
+}
+
+.status-cancelled {
+  background: rgba(230, 99, 107, 0.15);
+  color: var(--danger);
+}
+
+.trip-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trip-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.trip-detail-row > span:first-child {
+  color: var(--text-dim);
+}
+
+.cancel-link {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  margin-top: 4px;
+  font-family: var(--font-body);
+}
+
+.cancel-link:hover {
+  text-decoration: underline;
+}
+
+.trip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trip-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.trip-list-item:last-child {
+  border-bottom: none;
+}
+
+.trip-list-route {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.trip-list-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.trip-list-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* ---------------- Map picker ---------------- */
+
+.point-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.point-toggle-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.15s ease;
+}
+
+.point-toggle-btn.active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.point-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pickup-dot {
+  background: var(--accent);
+}
+
+.drop-dot {
+  background: #5d9cec;
+}
+
+.map-picker {
+  margin-bottom: 18px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+}
+
+.map-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 6px 0 0 0;
+}
+
+/* Dark-theme the default Leaflet chrome so it doesn't look like a
+   bright white rectangle dropped into an otherwise dark UI */
+.leaflet-control-zoom a {
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border-color: var(--panel-border) !important;
+}
+
+.leaflet-control-zoom {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.15s ease !important;
+}
+
+.leaflet-container:hover .leaflet-control-zoom {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(22, 29, 46, 0.85) !important;
+  color: var(--text-dim) !important;
+  font-size: 10px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--text-dim) !important;
+}
+
+.map-search {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.map-search-input {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font-body);
+}
+
+.map-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.map-search-spinner {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--panel-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: map-search-spin 0.6s linear infinite;
+}
+
+@keyframes map-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.map-search-results {
+  position: absolute;
+  z-index: 1000;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.map-search-results li {
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.map-search-results li:hover {
+  background: var(--bg);
+}
+
+/* ---------------- Driver dashboard ---------------- */
+
+.availability-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.availability-status {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.availability-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+.availability-hint-warning {
+  color: var(--danger);
+  margin-top: 6px;
+}
+
+.availability-toggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.availability-toggle.on {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.availability-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.availability-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s ease;
+}
+
+.availability-toggle.on .availability-toggle-knob {
+  transform: translateX(22px);
+  background: var(--bg);
+}
+
+.trip-action-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.trip-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.trip-action-btn:hover:not(:disabled) {
+  opacity: 0.9;
 }

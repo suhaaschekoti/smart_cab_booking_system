@@ -12,8 +12,11 @@ backend/
 │   ├── models.py        # ORM models -- one class per table, matches migrations/0001_initial_schema.sql
 │   ├── schemas.py       # Pydantic schemas for request/response validation (separate from ORM models)
 │   ├── auth.py          # password hashing + JWT create/decode
+│   ├── pricing.py        # Haversine distance + fare calculation
 │   └── routers/
-│       └── auth.py      # register/login for all 3 roles
+│       ├── auth.py      # register/login for all 3 roles
+│       ├── trips.py      # RIDE booking, matching, lifecycle
+│       └── drivers.py    # driver profile + availability toggle
 ├── migrations/          # numbered SQL files, source of truth for the actual schema
 ├── scripts/
 │   └── seed_db.py       # populates test data for local dev/demo (raw psycopg2, standalone script)
@@ -83,6 +86,7 @@ without also upgrading passlib and retesting.
 python scripts/seed_db.py
 ```
 (or `make seed` on Mac/Linux). All seeded accounts use password `password123`.
+Seeded drivers are set available, located near Kottayam, and have vehicles.
 
 ## Auth
 Three separate roles, each with its own register/login endpoints and JWT:
@@ -94,6 +98,58 @@ Each login returns a JWT (`access_token`) embedding the role, so a user's
 token can't be used to call driver/admin-only routes. To protect a new
 route, add the matching dependency:
 ```python
+from app.routers import auth
+
+@router.get("/my-trips")
+def my_trips(current_user: models.User = Depends(auth.get_current_user)):
+    ...
+```
+Equivalent dependencies: `auth.get_current_driver`, `auth.get_current_admin`.
+
+Test it via `/docs` — click "Authorize", paste a token (no "Bearer" prefix
+needed) obtained from the matching `/auth/{role}/login` call.
+
+## Trips (RIDE booking flow)
+- `POST /trips` — passenger requests a ride (pickup/drop location + coordinates).
+  Computes distance (Haversine) and fare, and auto-matches the nearest
+  available driver. Requires a passenger JWT.
+- `GET /trips/my` — passenger's trip history. Requires a passenger JWT.
+- `GET /trips/driver/assigned` — driver's assigned trips. Requires a driver JWT.
+- `PATCH /trips/{id}/accept` — driver accepts an assigned trip (REQUESTED → ACCEPTED)
+- `PATCH /trips/{id}/start` — driver starts the trip (ACCEPTED → ONGOING)
+- `PATCH /trips/{id}/complete` — driver completes the trip (ONGOING → COMPLETED)
+- `PATCH /trips/{id}/cancel` — passenger cancels their own trip
+
+Only `RIDE` is supported by `POST /trips` for now — `DRIVER_RENTAL` and
+`TOUR` will need their own request handling later since they use a
+different vehicle field (see `app/models.py`'s `Trip` CHECK constraint).
+
+Fare formula lives in `app/pricing.py` (flat base fare + per-km rate,
+straight-line distance) — tweak the constants there, not inline in the router.
+
+For a driver to actually get matched, they need `availability_status = TRUE`,
+a `current_lat`/`current_lng`, and a row in `vehicles`.
+
+## Drivers
+- `GET /drivers/me` — driver's own profile. Requires a driver JWT.
+- `PATCH /drivers/me/availability` — toggle online/offline, optionally
+  updating `current_lat`/`current_lng` in the same call (the frontend sends
+  browser geolocation when going online, since a driver with no location
+  is never matched — see `trips.py`'s `find_nearest_available_driver`).
+
+## Adding a new route
+Add a router file under `app/routers/`, then include it in `app/main.py`:
+```python
+from app.routers import payments
+app.include_router(payments.router, prefix="/payments", tags=["payments"])
+```
+Query via the ORM (`db: Session = Depends(get_db)`), e.g.:
+```python
+db.query(models.Trip).filter(models.Trip.user_id == user_id).all()
+```
+Always set `response_model=` on routes returning ORM objects (a matching
+`schemas.py` class with `from_attributes = True`) — FastAPI can't
+serialize raw SQLAlchemy model instances directly.
 
 ## Changing the schema
 Two things need to stay in sync when you change the schema:

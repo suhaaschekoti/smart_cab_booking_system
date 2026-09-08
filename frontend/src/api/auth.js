@@ -15,6 +15,25 @@ export async function register(role, payload) {
   return data;
 }
 
+// role: "user" | "driver" only -- admins have no email
+export async function verifyEmail(role, token) {
+  const { data } = await api.get(`/auth/${role}/verify-email`, { params: { token } });
+  return data; // { message }
+}
+
+export async function forgotPassword(role, email) {
+  const { data } = await api.post(`/auth/${role}/forgot-password`, { email });
+  return data; // { message }
+}
+
+export async function resetPassword(role, token, newPassword) {
+  const { data } = await api.post(`/auth/${role}/reset-password`, {
+    token,
+    new_password: newPassword,
+  });
+  return data; // { message }
+}
+
 export function saveSession(role, token) {
   localStorage.setItem("scb_token", token);
   localStorage.setItem("scb_role", role);
