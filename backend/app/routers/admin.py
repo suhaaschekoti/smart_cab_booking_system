@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -43,12 +43,12 @@ def list_drivers(db: Session = Depends(get_db), _: models.Admin = Depends(get_cu
 
 
 @router.get("/trips", response_model=list[schemas.TripOut])
-def list_trips(db: Session = Depends(get_db), _: models.Admin = Depends(get_current_admin), limit: int = 200):
+def list_trips(db: Session = Depends(get_db), _: models.Admin = Depends(get_current_admin), limit: int = Query(200, ge=1, le=1000)):
     return db.query(models.Trip).options(*TRIP_LOAD).order_by(models.Trip.created_at.desc()).limit(limit).all()
 
 
 @router.get("/payments", response_model=list[schemas.PaymentOut])
-def list_payments(db: Session = Depends(get_db), _: models.Admin = Depends(get_current_admin), limit: int = 200):
+def list_payments(db: Session = Depends(get_db), _: models.Admin = Depends(get_current_admin), limit: int = Query(200, ge=1, le=1000)):
     return db.query(models.Payment).order_by(models.Payment.payment_time.desc()).limit(limit).all()
 
 

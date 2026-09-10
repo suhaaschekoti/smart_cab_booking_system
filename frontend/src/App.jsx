@@ -11,6 +11,7 @@ import Rewards from "./pages/Rewards";
 import Safety from "./pages/Safety";
 import DriverDashboard from "./pages/DriverDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const P = (role, el) => <ProtectedRoute role={role}>{el}</ProtectedRoute>;
@@ -35,7 +36,8 @@ function AnimatedRoutes() {
           <Route path="/safety" element={P("user", <Safety />)} />
           <Route path="/driver/dashboard" element={P("driver", <DriverDashboard />)} />
           <Route path="/admin" element={P("admin", <AdminDashboard />)} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

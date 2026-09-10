@@ -1,8 +1,11 @@
-from fastapi import FastAPI, Depends
+import logging
+
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app import models, schemas
 from app.routers import (
@@ -16,6 +19,27 @@ app = FastAPI(
                 "emergency alerts, rewards, and admin monitoring.",
     version="1.0.0",
 )
+
+# Refuse to start with a weak/default JWT secret -- a guessable secret lets
+# anyone forge tokens for any role.
+_WEAK = {"", "change-this-to-a-long-random-string", "secret", "changeme"}
+if settings.jwt_secret_key.strip() in _WEAK or len(settings.jwt_secret_key) < 32:
+    raise RuntimeError(
+        "JWT_SECRET_KEY is missing, default, or shorter than 32 characters. "
+        "Set a long random value in backend/.env (e.g. `openssl rand -hex 32`)."
+    )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    resp.headers["Permissions-Policy"] = "camera=(), microphone=()"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
 
 app.add_middleware(
     CORSMiddleware,

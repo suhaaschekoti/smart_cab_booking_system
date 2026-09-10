@@ -6,6 +6,7 @@ Kept deliberately simple: synchronous smtplib call, no queue/retry.
 Fine for this project's scale (occasional verification/reset emails,
 not bulk sending).
 """
+import html
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -45,6 +46,7 @@ def send_email(to_email: str, subject: str, html_body: str) -> None:
 
 
 def send_verification_email(to_email: str, name: str, role: str, token: str) -> None:
+    name = html.escape(name)
     link = f"{settings.frontend_url}/verify-email?token={token}&role={role}"
     html = f"""
     <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
@@ -69,6 +71,7 @@ def send_verification_email(to_email: str, name: str, role: str, token: str) -> 
 
 
 def send_password_reset_email(to_email: str, name: str, role: str, token: str) -> None:
+    name = html.escape(name)
     link = f"{settings.frontend_url}/reset-password?token={token}&role={role}"
     html = f"""
     <div style="font-family: sans-serif; max-width: 480px; margin: auto;">

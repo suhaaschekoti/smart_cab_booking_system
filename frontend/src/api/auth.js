@@ -56,3 +56,10 @@ export async function fetchCurrentUser(token) {
   });
   return data;
 }
+
+// ---- profile self-service ----
+const h = (t) => ({ headers: { Authorization: `Bearer ${t}` } });
+export const getMyProfile = async (role, t) => (await api.get(role === "driver" ? "/drivers/me" : "/auth/user/me", h(t))).data;
+export const updateMyProfile = async (role, t, payload) => (await api.patch(`/auth/${role}/me`, payload, h(t))).data;
+export const changeMyPassword = async (role, t, currentPassword, newPassword) =>
+  (await api.post(`/auth/${role}/me/password`, { current_password: currentPassword, new_password: newPassword }, h(t))).data;

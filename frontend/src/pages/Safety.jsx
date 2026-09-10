@@ -12,7 +12,7 @@ export default function Safety() {
   useEffect(() => { fetchCurrentUser(session.token).then(setProfile).catch(() => navigate("/login")); getMyAlerts(session.token).then(setAlerts).catch(() => {}); }, [session.token, navigate]);
   return (
     <div className="dashboard-shell">
-      <Navbar role="user" name={profile?.name} />
+      <Navbar role="user" name={profile?.name} onProfileUpdated={setProfile} />
       <Page className="dashboard-content">
         <Card>
           <h2 className="card-title">Emergency contacts</h2>

@@ -294,7 +294,6 @@ def reject_trip(trip_id: int, db: Session = Depends(get_db), current_driver: mod
 
     # Try to re-match to someone else
     if trip.service_type == "DRIVER_RENTAL":
-        nxt = find_driver_any(db, float(trip.pickup_lat), float(trip.pickup_lng))
         others = [d for d in _available_driver_query(db).all() if d.driver_id != current_driver.driver_id]
         nxt = min(others, key=lambda d: haversine_km(float(trip.pickup_lat), float(trip.pickup_lng), float(d.current_lat), float(d.current_lng))) if others else None
         trip.driver_id = nxt.driver_id if nxt else None

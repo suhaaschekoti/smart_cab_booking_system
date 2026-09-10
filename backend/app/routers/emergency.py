@@ -1,3 +1,5 @@
+import html
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -45,24 +47,27 @@ def delete_contact(contact_id: int, db: Session = Depends(get_db), current_user:
 # ------------------------------------------------------------
 
 def _sos_email_html(user: models.User, trip: models.Trip, lat, lng) -> str:
+    e = html.escape
+    uname, uphone = e(user.name), e(user.phone)
+    pickup, drop = e(trip.pickup_location), e(trip.drop_location)
     maps_link = f"https://www.google.com/maps?q={lat},{lng}" if lat is not None and lng is not None else None
     driver_line = ""
     if trip.driver:
         veh = trip.driver.vehicles[0] if trip.driver.vehicles else None
         driver_line = f"""
-        <p><strong>Driver:</strong> {trip.driver.name} &middot; {trip.driver.phone}<br>
-        <strong>Vehicle:</strong> {veh.vehicle_number if veh else "—"} ({veh.vehicle_type if veh else "—"})</p>"""
+        <p><strong>Driver:</strong> {e(trip.driver.name)}, {e(trip.driver.phone)}<br>
+        <strong>Vehicle:</strong> {e(veh.vehicle_number) if veh else "—"} ({e(veh.vehicle_type or "") if veh else "—"})</p>"""
     loc = f'<p><a href="{maps_link}" style="background:#e6636b;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">Open live location in Google Maps</a></p>' if maps_link else "<p><em>Location unavailable at the time of alert.</em></p>"
     return f"""
     <div style="font-family:sans-serif;max-width:520px;margin:auto;">
-      <h2 style="color:#e6636b;">🚨 Emergency alert from {user.name}</h2>
-      <p>{user.name} ({user.phone}) has triggered an emergency alert during a Smart Cab Booking trip.</p>
+      <h2 style="color:#e6636b;">Emergency alert from {uname}</h2>
+      <p>{uname} ({uphone}) has triggered an emergency alert during a Smart Cab Booking trip.</p>
       <p><strong>Trip #{trip.trip_id}</strong><br>
-      From: {trip.pickup_location}<br>
-      To: {trip.drop_location}</p>
+      From: {pickup}<br>
+      To: {drop}</p>
       {driver_line}
       {loc}
-      <p style="color:#8891a7;font-size:13px;">Please try to contact {user.name} immediately. If you cannot reach them, consider contacting local emergency services.</p>
+      <p style="color:#8891a7;font-size:13px;">Please try to contact {uname} immediately. If you cannot reach them, consider contacting local emergency services.</p>
     </div>"""
 
 
@@ -91,12 +96,12 @@ def trigger_sos(payload: schemas.SOSIn, db: Session = Depends(get_db), current_u
     )
     db.add(alert); db.flush()
 
-    html = _sos_email_html(current_user, trip, payload.current_lat, payload.current_lng)
+    html_body = _sos_email_html(current_user, trip, payload.current_lat, payload.current_lng)
     for c in contacts:
         status_str = "SKIPPED"
         if c.contact_email:
             try:
-                send_email(c.contact_email, f"🚨 Emergency alert from {current_user.name}", html)
+                send_email(c.contact_email, f"Emergency alert from {current_user.name}", html_body)
                 status_str = "SENT"
             except Exception:
                 status_str = "FAILED"

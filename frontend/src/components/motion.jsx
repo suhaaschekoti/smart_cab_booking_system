@@ -1,5 +1,6 @@
 import { motion, AnimatePresence, useReducedMotion, useMotionValue, useSpring, useTransform } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export { motion, AnimatePresence };
 
@@ -106,3 +107,63 @@ export const Row = ({ children, className = "", ...rest }) => (
 );
 
 export const springs = { spring, soft };
+
+
+/**
+ * Anchored popover. Renders through a portal so it's never clipped by a
+ * parent with backdrop-filter (e.g. the glass navbar). Blurs the whole page
+ * behind it; clicking the backdrop or pressing Escape closes it.
+ *
+ * props: open, onClose, anchorRef (ref to the trigger element), width, children
+ */
+export function Popover({ open, onClose, anchorRef, width = 400, children }) {
+  const reduce = useReducedMotion();
+  const [pos, setPos] = useState({ top: 0, left: 0, w: width, caret: 0 });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    function place() {
+      const el = anchorRef?.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const w = Math.min(width, vw - 24);
+      let left = r.right - w;                 // align right edges with the trigger
+      left = Math.max(12, Math.min(left, vw - w - 12));
+      const caret = Math.max(18, Math.min(w - 18, r.left + r.width / 2 - left)); // caret under trigger centre
+      setPos({ top: r.bottom + 10, left, w, caret });
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, anchorRef, width]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === "Escape" && onClose?.();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div key="bd" className="popover-backdrop" onClick={onClose}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
+          <motion.div key="pop" className="popover" role="dialog" aria-modal="true"
+            style={{ top: pos.top, left: pos.left, width: pos.w, "--caret-x": `${pos.caret}px`, transformOrigin: `${pos.caret}px -10px` }}
+            onClick={(e) => e.stopPropagation()}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -6, transition: { duration: 0.14 } }}
+            transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}>
+            {children}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
+  );
+}

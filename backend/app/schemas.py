@@ -1,7 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+
+Password = Field(min_length=8, max_length=128, description="At least 8 characters")
+Phone = Field(min_length=10, max_length=15, pattern=r"^\+?[0-9]{10,15}$")
 
 
 class _Orm(BaseModel):
@@ -34,10 +37,10 @@ class AttractionIn(BaseModel):
 # ---------------- Auth: Users ----------------
 
 class UserRegisterIn(BaseModel):
-    name: str
+    name: str = Field(min_length=2, max_length=100)
     email: EmailStr
-    phone: str
-    password: str
+    phone: str = Phone
+    password: str = Password
     gender: str | None = None
 
 
@@ -59,8 +62,8 @@ class UserOut(_Orm):
 class DriverRegisterIn(BaseModel):
     name: str
     email: EmailStr
-    phone: str
-    password: str
+    phone: str = Phone
+    password: str = Password
     license_number: str
     vehicle_number: str
     vehicle_type: str | None = None
@@ -92,8 +95,8 @@ class DriverAvailabilityIn(BaseModel):
 # ---------------- Auth: Admins ----------------
 
 class AdminRegisterIn(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=3, max_length=100)
+    password: str = Password
 
 
 class AdminOut(_Orm):
@@ -124,7 +127,25 @@ class ForgotPasswordIn(BaseModel):
 
 class ResetPasswordIn(BaseModel):
     token: str
-    new_password: str
+    new_password: str = Password
+
+
+# ---------------- Profile management ----------------
+
+class UserUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    phone: str | None = Field(default=None, min_length=10, max_length=15, pattern=r"^\+?[0-9]{10,15}$")
+    gender: str | None = Field(default=None, max_length=20)
+
+
+class DriverUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    phone: str | None = Field(default=None, min_length=10, max_length=15, pattern=r"^\+?[0-9]{10,15}$")
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Password
 
 
 # ---------------- User vehicles (for DRIVER_RENTAL) ----------------
