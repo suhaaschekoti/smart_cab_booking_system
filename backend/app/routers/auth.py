@@ -56,6 +56,8 @@ def login_user(payload: schemas.LoginIn, db: Session = Depends(get_db)):
             status.HTTP_403_FORBIDDEN,
             "Please verify your email before logging in. Check your inbox for the verification link.",
         )
+    if not user.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your account has been suspended. Contact support.")
     token = create_access_token(subject=str(user.user_id), role="user")
     return schemas.TokenOut(access_token=token)
 
@@ -176,6 +178,8 @@ def login_driver(payload: schemas.LoginIn, db: Session = Depends(get_db)):
             status.HTTP_403_FORBIDDEN,
             "Please verify your email before logging in. Check your inbox for the verification link.",
         )
+    if not driver.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your account has been suspended. Contact support.")
     token = create_access_token(subject=str(driver.driver_id), role="driver")
     return schemas.TokenOut(access_token=token)
 

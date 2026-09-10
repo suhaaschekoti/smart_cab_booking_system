@@ -20,6 +20,7 @@ class User(Base):
     safety_mode_enabled = Column(Boolean, default=False)
     is_flagged = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     trips = relationship("Trip", back_populates="user")
@@ -42,6 +43,7 @@ class Driver(Base):
     current_lat = Column(DECIMAL(9, 6))
     current_lng = Column(DECIMAL(9, 6))
     is_verified = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     vehicles = relationship("Vehicle", back_populates="driver")
@@ -62,8 +64,7 @@ class Vehicle(Base):
 
 
 class UserVehicle(Base):
-    """A passenger's own vehicle -- used only for DRIVER_RENTAL trips
-    (a driver comes to drive the passenger's car, e.g. drunk pickup)."""
+    """A passenger's own vehicle -- used only for DRIVER_RENTAL trips."""
     __tablename__ = "user_vehicles"
 
     user_vehicle_id = Column(Integer, primary_key=True, index=True)
@@ -86,7 +87,7 @@ class Admin(Base):
 
 
 class Attraction(Base):
-    """Tour guide feature -- suggested nearby places a user can book a ride/tour to."""
+    """Tour guide feature -- suggested nearby places a user can book a tour to."""
     __tablename__ = "attractions"
 
     attraction_id = Column(Integer, primary_key=True, index=True)
@@ -107,10 +108,10 @@ class Trip(Base):
     trip_id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     driver_id = Column(Integer, ForeignKey("drivers.driver_id"))
-    vehicle_id = Column(Integer, ForeignKey("vehicles.vehicle_id"))               # RIDE / TOUR
-    user_vehicle_id = Column(Integer, ForeignKey("user_vehicles.user_vehicle_id"))  # DRIVER_RENTAL
-    attraction_id = Column(Integer, ForeignKey("attractions.attraction_id"))       # TOUR destination
-    service_type = Column(String(20), nullable=False, default="RIDE")  # RIDE / DRIVER_RENTAL / TOUR
+    vehicle_id = Column(Integer, ForeignKey("vehicles.vehicle_id"))
+    user_vehicle_id = Column(Integer, ForeignKey("user_vehicles.user_vehicle_id"))
+    attraction_id = Column(Integer, ForeignKey("attractions.attraction_id"))
+    service_type = Column(String(20), nullable=False, default="RIDE")
     pickup_location = Column(String(255), nullable=False)
     pickup_lat = Column(DECIMAL(9, 6))
     pickup_lng = Column(DECIMAL(9, 6))
@@ -118,16 +119,17 @@ class Trip(Base):
     drop_lat = Column(DECIMAL(9, 6))
     drop_lng = Column(DECIMAL(9, 6))
     distance_km = Column(DECIMAL(6, 2))
-    duration_hours = Column(DECIMAL(5, 2))  # used for DRIVER_RENTAL (time-based billing)
+    duration_hours = Column(DECIMAL(5, 2))
     fare = Column(DECIMAL(8, 2))
+    surge_multiplier = Column(DECIMAL(3, 2), default=1.00)
+    vehicle_type_multiplier = Column(DECIMAL(3, 2), default=1.00)
+    night_surcharge = Column(Boolean, default=False)
     trip_status = Column(String(20), default="REQUESTED")
+    cancellation_reason = Column(String(255))
     start_time = Column(TIMESTAMP)
     end_time = Column(TIMESTAMP)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
-    # Matches migrations/0002_relax_trip_vehicle_check.sql -- the vehicle
-    # consistency rule only applies once a driver is actually assigned;
-    # an unmatched trip (driver_id IS NULL) can have both vehicle fields null.
     __table_args__ = (
         CheckConstraint(
             "(driver_id IS NULL) OR "
@@ -143,6 +145,28 @@ class Trip(Base):
     payment = relationship("Payment", back_populates="trip", uselist=False)
     feedback = relationship("Feedback", back_populates="trip", uselist=False)
 
+    # Computed fields exposed via Pydantic from_attributes -- avoids the
+    # frontend having to make separate lookups for display names.
+    @property
+    def driver_name(self):
+        return self.driver.name if self.driver else None
+
+    @property
+    def driver_phone(self):
+        return self.driver.phone if self.driver else None
+
+    @property
+    def driver_rating(self):
+        return float(self.driver.rating) if self.driver and self.driver.rating else None
+
+    @property
+    def attraction_name(self):
+        return self.attraction.name if self.attraction else None
+
+    @property
+    def passenger_name(self):
+        return self.user.name if self.user else None
+
 
 class Payment(Base):
     __tablename__ = "payments"
@@ -150,6 +174,8 @@ class Payment(Base):
     payment_id = Column(Integer, primary_key=True, index=True)
     trip_id = Column(Integer, ForeignKey("trips.trip_id"), unique=True, nullable=False)
     amount = Column(DECIMAL(8, 2), nullable=False)
+    discount_applied = Column(DECIMAL(8, 2), default=0)
+    points_redeemed = Column(Integer, default=0)
     payment_mode = Column(String(20))
     payment_status = Column(String(20), default="PENDING")
     payment_time = Column(TIMESTAMP)
@@ -178,6 +204,7 @@ class EmergencyContact(Base):
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     contact_name = Column(String(100), nullable=False)
     contact_phone = Column(String(15), nullable=False)
+    contact_email = Column(String(150))
     relation = Column(String(50))
     created_at = Column(TIMESTAMP, server_default=func.now())
 
@@ -196,6 +223,8 @@ class SafetyAlert(Base):
     alert_status = Column(String(20), default="SENT")
     alert_time = Column(TIMESTAMP, server_default=func.now())
 
+    notifications = relationship("AlertNotification", backref="alert")
+
 
 class AlertNotification(Base):
     __tablename__ = "alert_notifications"
@@ -203,7 +232,7 @@ class AlertNotification(Base):
     notification_id = Column(Integer, primary_key=True, index=True)
     alert_id = Column(Integer, ForeignKey("safety_alerts.alert_id", ondelete="CASCADE"), nullable=False)
     contact_id = Column(Integer, ForeignKey("emergency_contacts.contact_id"), nullable=False)
-    notified_via = Column(String(20), default="SMS")
+    notified_via = Column(String(20), default="EMAIL")
     delivery_status = Column(String(20), default="SENT")
     sent_at = Column(TIMESTAMP, server_default=func.now())
 
