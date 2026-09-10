@@ -18,15 +18,15 @@ function pinIcon(color) {
     html: `<div style="
       width: 22px; height: 22px; border-radius: 50% 50% 50% 0;
       background: ${color}; transform: rotate(-45deg);
-      border: 2px solid #0f1420; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      border: 2px solid rgba(0,0,0,.55); box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     "></div>`,
     iconSize: [22, 22],
     iconAnchor: [11, 22],
   });
 }
 
-const PICKUP_ICON = pinIcon("#f4b942");
-const DROP_ICON = pinIcon("#5d9cec");
+const PICKUP_ICON = pinIcon("#f5b400");
+const DROP_ICON = pinIcon("#5da9ff");
 
 async function reverseGeocode(lat, lng) {
   try {
@@ -182,7 +182,7 @@ export default function MapPicker({ activePoint, pickup, drop, onPointSelected }
       <MapContainer
         center={DEFAULT_CENTER}
         zoom={DEFAULT_ZOOM}
-        style={{ height: "320px", width: "100%", borderRadius: "8px" }}
+        style={{ height: "440px", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -194,7 +194,7 @@ export default function MapPicker({ activePoint, pickup, drop, onPointSelected }
         {drop && <Marker position={[drop.lat, drop.lng]} icon={DROP_ICON} />}
       </MapContainer>
       {geocoding && <p className="map-hint">Looking up address...</p>}
-      <p className="map-hint">Search above, or click directly on the map.</p>
+      
     </div>
   );
 }
