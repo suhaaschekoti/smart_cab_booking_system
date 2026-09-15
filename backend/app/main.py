@@ -1,16 +1,46 @@
-from fastapi import FastAPI, Depends
+import logging
+
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app import models, schemas
-from app.routers import auth
+from app.routers import (
+    auth, trips, drivers, payments, feedback,
+    emergency, rewards, vehicles, attractions, admin,
+)
 
-app = FastAPI(title="Smart Cab Booking System API")
+app = FastAPI(
+    title="Smart Cab Booking System API",
+    description="B.Tech project -- IIIT Kottayam. Ride booking, driver rental, tour guide, "
+                "emergency alerts, rewards, and admin monitoring.",
+    version="1.0.0",
+)
 
-# Allow the React dev server to call this API. Tighten this list
-# once you have a real deployed frontend URL.
+# Refuse to start with a weak/default JWT secret -- a guessable secret lets
+# anyone forge tokens for any role.
+_WEAK = {"", "change-this-to-a-long-random-string", "secret", "changeme"}
+if settings.jwt_secret_key.strip() in _WEAK or len(settings.jwt_secret_key) < 32:
+    raise RuntimeError(
+        "JWT_SECRET_KEY is missing, default, or shorter than 32 characters. "
+        "Set a long random value in backend/.env (e.g. `openssl rand -hex 32`)."
+    )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    resp.headers["Permissions-Policy"] = "camera=(), microphone=()"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -20,37 +50,28 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(trips.router, prefix="/trips", tags=["trips"])
+app.include_router(drivers.router, prefix="/drivers", tags=["drivers"])
+app.include_router(payments.router, prefix="/payments", tags=["payments"])
+app.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
+app.include_router(emergency.router, prefix="/emergency", tags=["emergency"])
+app.include_router(rewards.router, prefix="/rewards", tags=["rewards"])
+app.include_router(vehicles.router, prefix="/vehicles", tags=["user-vehicles"])
+app.include_router(attractions.router, prefix="/attractions", tags=["attractions"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
 
 @app.get("/")
 def root():
-    return {"message": "Smart Cab Booking System API is running"}
+    return {"message": "Smart Cab Booking System API is running", "docs": "/docs"}
 
 
 @app.get("/health/db")
 def db_health_check(db: Session = Depends(get_db)):
-    """Quick check that the API can actually reach Postgres."""
     db.execute(text("SELECT 1"))
     return {"database": "connected"}
 
 
-@app.get("/attractions", response_model=list[schemas.AttractionOut])
-def list_attractions(db: Session = Depends(get_db)):
-    """Example public ORM route -- tour guide feature, list all attractions."""
-    return db.query(models.Attraction).order_by(models.Attraction.name).all()
-
-
 @app.get("/users/me", response_model=schemas.UserOut)
 def get_my_profile(current_user: models.User = Depends(auth.get_current_user)):
-    """
-    Example PROTECTED route -- requires a valid user JWT (from /auth/user/login).
-    Use this same Depends(auth.get_current_user) pattern on any route that
-    should only work for a logged-in passenger. Equivalent dependencies
-    exist for drivers (auth.get_current_driver) and admins (auth.get_current_admin).
-    """
     return current_user
-
-
-# More routers get included here as they're built, e.g.:
-# from app.routers import trips
-# app.include_router(trips.router, prefix="/trips", tags=["trips"])
