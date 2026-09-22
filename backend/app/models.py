@@ -124,6 +124,7 @@ class Trip(Base):
     surge_multiplier = Column(DECIMAL(3, 2), default=1.00)
     vehicle_type_multiplier = Column(DECIMAL(3, 2), default=1.00)
     night_surcharge = Column(Boolean, default=False)
+    peak_multiplier = Column(DECIMAL(3, 2), default=1.00)
     trip_status = Column(String(20), default="REQUESTED")
     cancellation_reason = Column(String(255))
     start_time = Column(TIMESTAMP)

@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field
+from typing import Literal
 
 Password = Field(min_length=8, max_length=128, description="At least 8 characters")
 Phone = Field(min_length=10, max_length=15, pattern=r"^\+?[0-9]{10,15}$")
@@ -196,22 +197,27 @@ class RentalRequestIn(BaseModel):
 
 
 class FareEstimateIn(BaseModel):
-    service_type: str  # RIDE / TOUR / DRIVER_RENTAL
-    pickup_lat: Decimal
-    pickup_lng: Decimal
-    drop_lat: Decimal | None = None
-    drop_lng: Decimal | None = None
-    preferred_vehicle_type: str | None = None
-    duration_hours: Decimal | None = None
+    service_type: Literal["RIDE", "TOUR", "DRIVER_RENTAL"]
+    pickup_lat: Decimal = Field(ge=-90, le=90)
+    pickup_lng: Decimal = Field(ge=-180, le=180)
+    drop_lat: Decimal | None = Field(default=None, ge=-90, le=90)
+    drop_lng: Decimal | None = Field(default=None, ge=-180, le=180)
+    preferred_vehicle_type: Literal["Hatchback", "Sedan", "SUV"] | None = None
+    duration_hours: Decimal | None = Field(default=None, gt=0, le=24)
 
 
 class FareEstimateOut(BaseModel):
     service_type: str
     distance_km: Decimal | None = None
+    effective_distance_km: Decimal | None = None
+    estimated_minutes: Decimal | None = None
     billed_hours: Decimal | None = None
     base_fare: Decimal
     vehicle_type_multiplier: Decimal
     night_surcharge: bool
+    night_multiplier: Decimal = Decimal("1.00")
+    peak_surcharge: bool = False
+    peak_multiplier: Decimal = Decimal("1.00")
     surge_multiplier: Decimal
     tour_guide_fee: Decimal = Decimal("0.00")
     fare: Decimal
@@ -246,6 +252,7 @@ class TripOut(_Orm):
     surge_multiplier: Decimal | None = None
     vehicle_type_multiplier: Decimal | None = None
     night_surcharge: bool | None = None
+    peak_multiplier: Decimal | None = None
     trip_status: str
     cancellation_reason: str | None = None
     start_time: datetime | None = None
