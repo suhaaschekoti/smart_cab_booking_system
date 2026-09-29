@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, EmailStr, Field
 
 Password = Field(min_length=8, max_length=128, description="At least 8 characters")
@@ -365,3 +365,19 @@ class AdminStatsOut(BaseModel):
 
 class AdminToggleIn(BaseModel):
     value: bool
+
+class DynamicAttractionOut(BaseModel):
+    id: int
+    name: str
+    category: str
+    latitude: float
+    longitude: float
+    distance_km: float
+    description: Optional[str] = None
+
+class DynamicAttractionsResponse(BaseModel):
+    user_lat: float
+    user_lng: float
+    radius_km: float
+    count: int
+    attractions: List[DynamicAttractionOut]

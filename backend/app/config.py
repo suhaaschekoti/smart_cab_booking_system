@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-
+from typing import Optional
 
 class Settings(BaseSettings):
     database_url: str
@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440
     environment: str = "development"
-
+    groq_api_key: Optional[str] = None
     # Email verification / password reset token lifetimes
     email_verification_expire_minutes: int = 60
     password_reset_expire_minutes: int = 30
