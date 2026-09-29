@@ -44,23 +44,27 @@ async def fetch_dynamic_attractions(lat: float, lng: float, radius_km: float = 4
         if now - timestamp < CACHE_TTL:
             return cached
 
-    # Calculate bounding box (~0.009 deg lat per km, ~0.009 deg lng per km)
     delta_deg = radius_km / 111.0
     min_lat = lat - delta_deg
     max_lat = lat + delta_deg
     min_lng = lng - (delta_deg / math.cos(math.radians(lat)))
     max_lng = lng + (delta_deg / math.cos(math.radians(lat)))
     
-    # Nominatim viewbox format: <left>,<top>,<right>,<bottom> = min_lng,max_lat,max_lng,min_lat
     viewbox = f"{min_lng},{max_lat},{max_lng},{min_lat}"
 
-    # Search categories: tourist attractions, waterfalls, viewpoints
-    queries = ["tourist attraction", "waterfall", "viewpoint"]
+    # Target specific historic, cultural, and scenic attractions
+    queries = [
+        "historic monument",
+        "heritage site",
+        "temple church",
+        "tourist attraction",
+        "waterfall viewpoint"
+    ]
     results = []
     seen = set()
 
     headers = {
-        "User-Agent": "SmartCabBookingSystem-IIITK/1.0 (academic-project; student@iiitkottayam.ac.in)"
+        "User-Agent": "SmartCabBookingSystem/1.0 (academic-project; contact@cabdemo.local)"
     }
 
     async with httpx.AsyncClient(timeout=8.0) as client:
@@ -78,10 +82,23 @@ async def fetch_dynamic_attractions(lat: float, lng: float, radius_km: float = 4
                 if res.status_code == 200:
                     items = res.json()
                     for item in items:
-                        name = item.get("display_name", "").split(",")[0].strip()
-                        if not name or name in seen:
-                            continue
+                        addr = item.get("address", {})
+                        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county") or "Nearby"
                         
+                        raw_name = item.get("name") or item.get("display_name", "").split(",")[0].strip()
+                        osm_class = item.get("class", "")
+                        osm_type = item.get("type", "")
+
+                        # Filter out highway/road artifacts, pure admin boundaries, and generic city-center labels
+                        if (
+                            not raw_name
+                            or len(raw_name) < 4
+                            or raw_name.lower() in [city.lower(), "kottayam", "mumbai", "karachi", "india"]
+                            or osm_class in ["highway", "road", "boundary", "place", "administrative"]
+                            or raw_name in seen
+                        ):
+                            continue
+
                         spot_lat = float(item["lat"])
                         spot_lng = float(item["lon"])
                         dist = calculate_haversine(lat, lng, spot_lat, spot_lng)
@@ -89,25 +106,21 @@ async def fetch_dynamic_attractions(lat: float, lng: float, radius_km: float = 4
                         if dist > radius_km:
                             continue
 
-                        seen.add(name)
-                        category = map_category(item.get("class", ""), item.get("type", ""))
-                        
-                        # Extract city or town from address
-                        addr = item.get("address", {})
-                        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county") or "Nearby"
+                        seen.add(raw_name)
+                        category = map_category(osm_class, osm_type)
 
                         results.append({
                             "id": item.get("place_id"),
-                            "name": name,
+                            "name": raw_name,
                             "category": category,
                             "city": city,
                             "latitude": spot_lat,
                             "longitude": spot_lng,
                             "distance_km": dist,
-                            "description": f"Located in {city}, ~{dist} km from your pickup point."
+                            "description": f"Historic & cultural spot located in {city}, ~{dist} km away."
                         })
             except Exception as e:
-                logger.warning(f"Nominatim query failed for '{q}': {e}")
+                logger.warning(f"Discovery query error for '{q}': {e}")
                 continue
 
     results.sort(key=lambda x: x["distance_km"])

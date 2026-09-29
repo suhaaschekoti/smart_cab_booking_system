@@ -13,8 +13,9 @@ def get_groq_client():
         return None
     return AsyncGroq(api_key=api_key)
 
-PREFERRED_MODELS = [
-    "llama-3.3-70b-specdec",
+CHAT_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
     "llama3-70b-8192",
     "llama3-8b-8192",
     "mixtral-8x7b-32768",
@@ -22,20 +23,31 @@ PREFERRED_MODELS = [
 ]
 
 async def resolve_active_model(client: AsyncGroq) -> str:
-    """Finds the first available supported model for the active API key."""
+    """Finds an active chat model while strictly ignoring audio/whisper models."""
     try:
         model_list = await client.models.list()
         available_ids = {m.id for m in model_list.data}
         logger.info(f"Available Groq models: {available_ids}")
-        for candidate in PREFERRED_MODELS:
+
+        # 1. Match our vetted chat model list first
+        for candidate in CHAT_MODELS:
             if candidate in available_ids:
                 return candidate
-        # If none of the preferred match, grab any chat-capable model
-        if available_ids:
-            return list(available_ids)[0]
+
+        # 2. Filter out non-chat models (whisper, embeddings, etc.)
+        valid_chat_models = [
+            m_id for m_id in available_ids 
+            if not any(excluded in m_id.lower() for excluded in ["whisper", "embed", "tts", "guard"])
+        ]
+        
+        if valid_chat_models:
+            return valid_chat_models[0]
+            
     except Exception as e:
-        logger.warning(f"Could not list Groq models: {e}")
-    return "llama3-70b-8192"
+        logger.warning(f"Could not query Groq models dynamically: {e}")
+
+    # Fallback to standard chat endpoint
+    return "llama-3.3-70b-versatile"
 
 async def generate_tour_itinerary(
     user_prompt: str,
@@ -67,28 +79,30 @@ async def generate_tour_itinerary(
     ]
 
     system_prompt = f"""
-You are an expert cab trip planner and tour concierge.
-Create a customized cab tour based on the passenger's request.
+You are an expert cab trip planner and local tour guide.
+Create an authentic, structured sightseeing cab itinerary based on the passenger's request.
 Available time: {duration_hours} hours.
 Reference coordinates: ({pickup_coords['lat']}, {pickup_coords['lng']}).
 
-RULES:
-1. Prioritize attractions from the candidate list that match the user's intent. If candidate attractions are provided, select 2 to 4 of them.
-2. If the user explicitly asks for a city and the candidates do not match, suggest real, well-known attractions for that city with realistic latitudes and longitudes.
-3. Respond ONLY with a valid JSON object matching this schema:
+STRICT RULES:
+1. Every stop MUST have a unique, descriptive landmark or attraction name (e.g., "Thirunakkara Mahadeva Temple", "Thazhathangady Juma Masjid", "Poonjar Palace", "Kumarakom Bird Sanctuary").
+2. NEVER use just the name of a city, state, or region (like "Kottayam" or "Kerala") as a stop name.
+3. Every stop in the itinerary must have a distinct, non-duplicate name.
+4. If candidate attractions are available, choose the best matches. If the candidate list is sparse or contains generic names, suggest genuine, real-world heritage and sightseeing landmarks for the region with accurate coordinates.
+5. Respond ONLY with a valid JSON object matching this schema:
 {{
-  "title": "Short title",
-  "summary": "1-2 sentence overview explaining how this matches their vibe",
+  "title": "Short descriptive title (e.g. Heritage Trail of Kottayam)",
+  "summary": "1-2 sentence overview explaining the experience",
   "total_estimated_time": "{duration_hours} hours",
   "stops": [
     {{
       "id": 1,
-      "name": "Attraction Name",
-      "category": "Category",
-      "latitude": 24.8607,
-      "longitude": 67.0011,
-      "recommended_duration": "1 hour",
-      "why_visit": "Short compelling reason"
+      "name": "Specific Landmark Name",
+      "category": "Historical / Culture / Nature",
+      "latitude": 9.5916,
+      "longitude": 76.5222,
+      "recommended_duration": "45 mins",
+      "why_visit": "Compelling historic or visual highlight"
     }}
   ],
   "tips": "One practical travel tip"
