@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app import models, schemas
 from app.database import get_db
 from app.pricing import (
-    haversine_km, is_night, compute_surge_multiplier,
+    IST, haversine_km, is_night, is_peak, compute_surge_multiplier,
     calculate_ride_fare, calculate_rental_fare, REWARD_POINTS_PER_TRIP,
 )
 from app.routers import auth
@@ -15,6 +15,35 @@ from app.routers import auth
 router = APIRouter()
 
 TRIP_LOAD = [joinedload(models.Trip.driver), joinedload(models.Trip.attraction), joinedload(models.Trip.user)]
+
+
+def _now_ist():
+    from datetime import datetime as _dt
+    return _dt.now(IST)
+
+
+def _price_ride(db: Session, pickup_lat: float, pickup_lng: float,
+                drop_lat: float, drop_lng: float,
+                vehicle_type: str | None, is_tour: bool, now) -> tuple[float, dict]:
+    """Single pricing path shared by estimate + booking (same surge/peak/eff/km)."""
+    distance = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
+    night = is_night(now)
+    peak = is_peak(now)
+    surge = compute_surge_multiplier(db, pickup_lat, pickup_lng, now=now)
+    try:
+        b = calculate_ride_fare(distance, vehicle_type, surge, night, is_tour=is_tour, peak=peak)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+    return distance, b
+
+
+def _price_rental(db: Session, pickup_lat: float, pickup_lng: float,
+                  duration_hours: float, now) -> dict:
+    """Single rental pricing path shared by estimate + booking."""
+    night = is_night(now)
+    peak = is_peak(now)
+    surge = compute_surge_multiplier(db, pickup_lat, pickup_lng, now=now)
+    return calculate_rental_fare(duration_hours, night, peak=peak, surge=surge)
 
 
 # ------------------------------------------------------------
@@ -90,21 +119,23 @@ def estimate_fare(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    night = is_night()
-    st = payload.service_type.upper()
+    now = _now_ist()
+    st = payload.service_type  # already Literal, no .upper() needed
 
     if st == "DRIVER_RENTAL":
         if payload.duration_hours is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "duration_hours required for DRIVER_RENTAL")
-        b = calculate_rental_fare(float(payload.duration_hours), night)
+        b = _price_rental(db, float(payload.pickup_lat), float(payload.pickup_lng), float(payload.duration_hours), now)
         return schemas.FareEstimateOut(service_type=st, billed_hours=b["billed_hours"], **{k: v for k, v in b.items() if k != "billed_hours"})
 
     if payload.drop_lat is None or payload.drop_lng is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "drop coordinates required")
 
-    distance = haversine_km(float(payload.pickup_lat), float(payload.pickup_lng), float(payload.drop_lat), float(payload.drop_lng))
-    surge = compute_surge_multiplier(db)
-    b = calculate_ride_fare(distance, payload.preferred_vehicle_type, surge, night, is_tour=(st == "TOUR"))
+    distance, b = _price_ride(
+        db, float(payload.pickup_lat), float(payload.pickup_lng),
+        float(payload.drop_lat), float(payload.drop_lng),
+        payload.preferred_vehicle_type, is_tour=(st == "TOUR"), now=now,
+    )
     return schemas.FareEstimateOut(service_type=st, distance_km=Decimal(str(round(distance, 2))), **b)
 
 
@@ -121,13 +152,23 @@ def request_ride(
     if not current_user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your account is suspended")
 
-    distance = haversine_km(float(payload.pickup_lat), float(payload.pickup_lng), float(payload.drop_lat), float(payload.drop_lng))
-    night = is_night()
-    surge = compute_surge_multiplier(db)
+    now = _now_ist()
+    distance, b = _price_ride(
+        db, float(payload.pickup_lat), float(payload.pickup_lng),
+        float(payload.drop_lat), float(payload.drop_lng),
+        payload.preferred_vehicle_type, is_tour=False, now=now,
+    )
 
     driver, vehicle = find_driver_with_vehicle(db, float(payload.pickup_lat), float(payload.pickup_lng), payload.preferred_vehicle_type)
     vtype = vehicle.vehicle_type if vehicle else payload.preferred_vehicle_type
-    b = calculate_ride_fare(distance, vtype, surge, night)
+    if vtype != b.get("vehicle_type"):
+        # Re-price with the actually assigned vehicle type so the persisted
+        # fare matches what the driver will fulfil (same surge/peak/night).
+        _, b = _price_ride(
+            db, float(payload.pickup_lat), float(payload.pickup_lng),
+            float(payload.drop_lat), float(payload.drop_lng),
+            vtype, is_tour=False, now=now,
+        )
 
     trip = models.Trip(
         user_id=current_user.user_id,
@@ -141,6 +182,7 @@ def request_ride(
         surge_multiplier=b["surge_multiplier"],
         vehicle_type_multiplier=b["vehicle_type_multiplier"],
         night_surcharge=b["night_surcharge"],
+        peak_multiplier=b["peak_multiplier"],
         trip_status="REQUESTED",
     )
     db.add(trip); db.commit(); db.refresh(trip)
@@ -164,13 +206,21 @@ def request_tour(
     if not attraction:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Attraction not found")
 
-    distance = haversine_km(float(payload.pickup_lat), float(payload.pickup_lng), float(attraction.latitude), float(attraction.longitude))
-    night = is_night()
-    surge = compute_surge_multiplier(db)
+    now = _now_ist()
+    distance, b = _price_ride(
+        db, float(payload.pickup_lat), float(payload.pickup_lng),
+        float(attraction.latitude), float(attraction.longitude),
+        payload.preferred_vehicle_type, is_tour=True, now=now,
+    )
 
     driver, vehicle = find_driver_with_vehicle(db, float(payload.pickup_lat), float(payload.pickup_lng), payload.preferred_vehicle_type)
     vtype = vehicle.vehicle_type if vehicle else payload.preferred_vehicle_type
-    b = calculate_ride_fare(distance, vtype, surge, night, is_tour=True)
+    if vtype != b.get("vehicle_type"):
+        _, b = _price_ride(
+            db, float(payload.pickup_lat), float(payload.pickup_lng),
+            float(attraction.latitude), float(attraction.longitude),
+            vtype, is_tour=True, now=now,
+        )
 
     trip = models.Trip(
         user_id=current_user.user_id,
@@ -185,6 +235,7 @@ def request_tour(
         surge_multiplier=b["surge_multiplier"],
         vehicle_type_multiplier=b["vehicle_type_multiplier"],
         night_surcharge=b["night_surcharge"],
+        peak_multiplier=b["peak_multiplier"],
         trip_status="REQUESTED",
     )
     db.add(trip); db.commit(); db.refresh(trip)
@@ -212,8 +263,8 @@ def request_rental(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Vehicle not found -- add it under 'My vehicles' first")
 
     distance = haversine_km(float(payload.pickup_lat), float(payload.pickup_lng), float(payload.drop_lat), float(payload.drop_lng))
-    night = is_night()
-    b = calculate_rental_fare(float(payload.duration_hours), night)
+    now = _now_ist()
+    b = _price_rental(db, float(payload.pickup_lat), float(payload.pickup_lng), float(payload.duration_hours), now)
 
     driver = find_driver_any(db, float(payload.pickup_lat), float(payload.pickup_lng))
 
@@ -227,9 +278,10 @@ def request_rental(
         distance_km=round(distance, 2),
         duration_hours=b["billed_hours"],
         fare=b["fare"],
-        surge_multiplier=Decimal("1.00"),
+        surge_multiplier=b["surge_multiplier"],
         vehicle_type_multiplier=Decimal("1.00"),
-        night_surcharge=night,
+        night_surcharge=b["night_surcharge"],
+        peak_multiplier=b["peak_multiplier"],
         trip_status="REQUESTED",
     )
     db.add(trip); db.commit(); db.refresh(trip)

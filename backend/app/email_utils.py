@@ -48,7 +48,7 @@ def send_email(to_email: str, subject: str, html_body: str) -> None:
 def send_verification_email(to_email: str, name: str, role: str, token: str) -> None:
     name = html.escape(name)
     link = f"{settings.frontend_url}/verify-email?token={token}&role={role}"
-    html = f"""
+    html_body = f"""
     <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
       <h2 style="color: #f4b942;">Smart Cab Booking</h2>
       <p>Hi {name},</p>
@@ -67,13 +67,13 @@ def send_verification_email(to_email: str, name: str, role: str, token: str) -> 
       </p>
     </div>
     """
-    send_email(to_email, "Verify your Smart Cab Booking account", html)
+    send_email(to_email, "Verify your Smart Cab Booking account", html_body)
 
 
 def send_password_reset_email(to_email: str, name: str, role: str, token: str) -> None:
     name = html.escape(name)
     link = f"{settings.frontend_url}/reset-password?token={token}&role={role}"
-    html = f"""
+    html_body = f"""
     <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
       <h2 style="color: #f4b942;">Smart Cab Booking</h2>
       <p>Hi {name},</p>
@@ -93,4 +93,4 @@ def send_password_reset_email(to_email: str, name: str, role: str, token: str) -
       </p>
     </div>
     """
-    send_email(to_email, "Reset your Smart Cab Booking password", html)
+    send_email(to_email, "Reset your Smart Cab Booking password", html_body)
