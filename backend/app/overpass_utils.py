@@ -1,6 +1,7 @@
 import math
 import time
 import httpx
+import asyncio
 import logging
 from typing import List, Dict, Any, Tuple
 
@@ -11,6 +12,43 @@ NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 # In-memory cache
 _CACHE: Dict[Tuple[float, float, int], Tuple[float, List[Dict[str, Any]]]] = {}
 CACHE_TTL = 3600
+
+EXCLUDED_NAME_KEYWORDS = {
+    "hotel",
+    "guest house",
+    "guesthouse",
+    "homestay",
+    "tourist home",
+    "resort",
+    "lodge",
+    "hostel",
+    "restaurant",
+    "cafe",
+    "shop",
+    "store",
+    "school",
+    "college",
+    "hospital",
+    "office",
+    "apartment"
+}
+
+GENERIC_NAMES = {
+    "temple",
+    "church",
+    "mosque",
+    "shrine",
+    "park",
+    "museum",
+    "monument",
+    "viewpoint",
+    "beach",
+    "waterfall",
+    "lake",
+    "fort",
+    "castle",
+    "palace"
+}
 
 def calculate_haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     r = 6371.0
@@ -35,95 +73,283 @@ def map_category(cls: str, osm_type: str) -> str:
         return "Culture"
     return "Tourist Attraction"
 
-async def fetch_dynamic_attractions(lat: float, lng: float, radius_km: float = 40.0) -> List[Dict[str, Any]]:
-    cache_key = (round(lat, 2), round(lng, 2), int(radius_km))
+async def fetch_dynamic_attractions(
+    lat: float,
+    lng: float,
+    radius_km: float = 40.0
+) -> List[Dict[str, Any]]:
+    cache_key = (
+        round(lat, 4),
+        round(lng, 4),
+        int(radius_km)
+    )
+
     now = time.time()
 
     if cache_key in _CACHE:
         timestamp, cached = _CACHE[cache_key]
+
         if now - timestamp < CACHE_TTL:
             return cached
 
     delta_deg = radius_km / 111.0
+
     min_lat = lat - delta_deg
     max_lat = lat + delta_deg
-    min_lng = lng - (delta_deg / math.cos(math.radians(lat)))
-    max_lng = lng + (delta_deg / math.cos(math.radians(lat)))
-    
-    viewbox = f"{min_lng},{max_lat},{max_lng},{min_lat}"
 
-    # Target specific historic, cultural, and scenic attractions
-    queries = [
-        "historic monument",
-        "heritage site",
-        "temple church",
-        "tourist attraction",
-        "waterfall viewpoint"
-    ]
-    results = []
-    seen = set()
+    cos_lat = math.cos(math.radians(lat))
+
+    if abs(cos_lat) < 0.01:
+        return []
+
+    delta_lng = delta_deg / cos_lat
+
+    min_lng = lng - delta_lng
+    max_lng = lng + delta_lng
+
+    viewbox = (
+        f"{min_lng},{max_lat},"
+        f"{max_lng},{min_lat}"
+    )
 
     headers = {
-        "User-Agent": "SmartCabBookingSystem/1.0 (academic-project; contact@cabdemo.local)"
+        "User-Agent": (
+            "SmartCabBookingSystem/1.0 "
+            "(academic-project)"
+        )
     }
 
-    async with httpx.AsyncClient(timeout=8.0) as client:
-        for q in queries:
+    queries = [
+        "tourist attraction",
+        "heritage site",
+        "historic monument",
+        "temple",
+        "church",
+        "palace",
+        "beach",
+        "park",
+        "waterfall",
+        "viewpoint",
+        "museum",
+        "memorial",
+        "aquarium",
+        "zoo",
+        "bird sanctuary"
+    ]
+
+    items = []
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for index, query in enumerate(queries):
             try:
                 params = {
-                    "q": q,
-                    "format": "json",
+                    "q": query,
+                    "format": "jsonv2",
                     "viewbox": viewbox,
                     "bounded": 1,
-                    "limit": 15,
-                    "addressdetails": 1
+                    "layer": "poi,natural",
+                    "limit": 10,
+                    "addressdetails": 1,
+                    "extratags": 1,
+                    "accept-language": "en"
                 }
-                res = await client.get(NOMINATIM_URL, params=params, headers=headers)
-                if res.status_code == 200:
-                    items = res.json()
-                    for item in items:
-                        addr = item.get("address", {})
-                        city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county") or "Nearby"
-                        
-                        raw_name = item.get("name") or item.get("display_name", "").split(",")[0].strip()
-                        osm_class = item.get("class", "")
-                        osm_type = item.get("type", "")
 
-                        # Filter out highway/road artifacts, pure admin boundaries, and generic city-center labels
-                        if (
-                            not raw_name
-                            or len(raw_name) < 4
-                            or raw_name.lower() in [city.lower(), "kottayam", "mumbai", "karachi", "india"]
-                            or osm_class in ["highway", "road", "boundary", "place", "administrative"]
-                            or raw_name in seen
-                        ):
-                            continue
+                response = await client.get(
+                    NOMINATIM_URL,
+                    params=params,
+                    headers=headers
+                )
 
-                        spot_lat = float(item["lat"])
-                        spot_lng = float(item["lon"])
-                        dist = calculate_haversine(lat, lng, spot_lat, spot_lng)
+                response.raise_for_status()
 
-                        if dist > radius_km:
-                            continue
+                query_results = response.json()
+                items.extend(query_results)
 
-                        seen.add(raw_name)
-                        category = map_category(osm_class, osm_type)
+                logger.info(
+                    f"Nominatim query '{query}' returned "
+                    f"{len(query_results)} results"
+                )
 
-                        results.append({
-                            "id": item.get("place_id"),
-                            "name": raw_name,
-                            "category": category,
-                            "city": city,
-                            "latitude": spot_lat,
-                            "longitude": spot_lng,
-                            "distance_km": dist,
-                            "description": f"Historic & cultural spot located in {city}, ~{dist} km away."
-                        })
-            except Exception as e:
-                logger.warning(f"Discovery query error for '{q}': {e}")
-                continue
+            except Exception as exc:
+                logger.warning(
+                    f"Nominatim query '{query}' failed: "
+                    f"{type(exc).__name__}: {repr(exc)}"
+                )
 
-    results.sort(key=lambda x: x["distance_km"])
+            if index < len(queries) - 1:
+                await asyncio.sleep(1.1)
+
+    results = []
+    seen = set()
+    seen_coordinates = []
+
+    for item in items:
+        raw_name = (
+            item.get("name")
+            or item.get(
+                "display_name",
+                ""
+            ).split(",")[0]
+        ).strip()
+
+        if not raw_name:
+            continue
+
+        normalized_name = " ".join(
+            raw_name.casefold().split()
+        )
+
+        if normalized_name in GENERIC_NAMES:
+            continue
+
+        if any(
+            keyword in normalized_name
+            for keyword in EXCLUDED_NAME_KEYWORDS
+        ):
+            continue
+
+        if any(
+            keyword in normalized_name
+            for keyword in {
+                "road",
+                "junction",
+                "bund road",
+                "bus stop",
+                "railway",
+                "station",
+                "stop",
+                "project",
+                "village road"
+            }
+        ):
+            continue
+
+        try:
+            spot_lat = float(item["lat"])
+            spot_lng = float(item["lon"])
+        except (
+            KeyError,
+            TypeError,
+            ValueError
+        ):
+            continue
+
+        distance = calculate_haversine(
+            lat,
+            lng,
+            spot_lat,
+            spot_lng
+        )
+
+        if distance > radius_km:
+            continue
+
+        address = item.get("address", {})
+
+        city = (
+            address.get("city")
+            or address.get("town")
+            or address.get("village")
+            or address.get("county")
+            or "Nearby"
+        )
+
+        if normalized_name == city.casefold():
+            continue
+
+        osm_class = item.get(
+            "class",
+            ""
+        )
+
+        osm_type = item.get(
+            "type",
+            ""
+        )
+
+        if normalized_name in seen:
+            continue
+
+        is_duplicate_location = False
+
+        for existing_lat, existing_lng in seen_coordinates:
+            if calculate_haversine(
+                spot_lat,
+                spot_lng,
+                existing_lat,
+                existing_lng
+            ) < 0.5:
+                is_duplicate_location = True
+                break
+
+        if is_duplicate_location:
+            continue
+
+        extratags = item.get(
+            "extratags",
+            {}
+        ) or {}
+
+        try:
+            importance = float(
+                item.get(
+                    "importance",
+                    0.0
+                ) or 0.0
+            )
+        except (
+            TypeError,
+            ValueError
+        ):
+            importance = 0.0
+
+        description = str(
+            extratags.get(
+                "description",
+                ""
+            )
+        ).strip()
+
+        seen.add(normalized_name)
+
+        seen_coordinates.append(
+            (spot_lat, spot_lng)
+        )
+
+        results.append({
+            "id": item.get("osm_id") or item.get("place_id"),
+            "name": raw_name,
+            "category": map_category(
+                osm_class,
+                osm_type
+            ),
+            "city": city,
+            "latitude": spot_lat,
+            "longitude": spot_lng,
+            "distance_km": distance,
+            "description": description,
+            "_importance": importance
+        })
+
+    results.sort(
+        key=lambda x: (
+            -x["_importance"],
+            x["distance_km"]
+        )
+    )
+
+    for result in results:
+        result.pop(
+            "_importance",
+            None
+        )
+
+    results = results[:20]
+
     if results:
-        _CACHE[cache_key] = (now, results)
+        _CACHE[cache_key] = (
+            now,
+            results
+        )
+
     return results
