@@ -16,10 +16,25 @@ class Settings(BaseSettings):
     # (e.g. http://localhost:5173/verify-email?token=...)
     frontend_url: str = "http://localhost:5173"
 
+    # Comma-separated browser origins allowed to call this API (CORS).
+    # In production set this to your deployed frontend URL(s).
+    allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     # Gmail SMTP -- gmail_app_password is a 16-character App Password,
     # NOT your normal Gmail password (see backend/README.md for setup).
     gmail_address: str = ""
     gmail_app_password: str = ""
+
+    brevo_api_key: str = ""
+    brevo_sender_email: str = ""
+    brevo_sender_name: str = "Rydex"
+
+    # HTTPS email via Resend (use this when deployed on a host that blocks
+    # SMTP, e.g. Render's free tier). When resend_api_key is set it is used
+    # instead of Gmail SMTP. email_from must be on a domain verified in
+    # Resend, e.g. "Smart Cab <noreply@yourdomain.com>".
+    resend_api_key: str = ""
+    email_from: str = ""
 
     class Config:
         env_file = ".env"

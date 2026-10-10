@@ -22,7 +22,10 @@ from app.auth import hash_password  # noqa: E402
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 PW = hash_password("password123")
-ADMIN_PW = hash_password("admin123")
+# Set ADMIN_PASSWORD before seeding any database that is reachable from the
+# internet; the fallback is a well-known demo password.
+_admin_plain = os.getenv("ADMIN_PASSWORD") or "admin123"
+ADMIN_PW = hash_password(_admin_plain)
 
 SEED_USERS = [
     ("Suhaas", "suhaas@example.com", "9000000001"),
@@ -82,7 +85,8 @@ def seed():
 
     conn.commit(); cur.close(); conn.close()
     print("Seed complete.")
-    print("  Users/drivers password: password123   Admin: admin / admin123")
+    admin_note = "admin123 (default, change it!)" if _admin_plain == "admin123" else "the ADMIN_PASSWORD you set"
+    print(f"  Users/drivers password: password123   Admin: admin / {admin_note}")
     print("  Drivers are verified, online, located near Kottayam, with vehicles.")
     print(f"  {len(SEED_ATTRACTIONS)} tourist attractions loaded for the tour guide.")
 

@@ -41,9 +41,13 @@ async def security_headers(request: Request, call_next):
     return resp
 
 
+_ORIGINS = [o.strip().rstrip("/") for o in settings.allowed_origins.split(",") if o.strip()]
+if "*" in _ORIGINS:
+    raise RuntimeError("ALLOWED_ORIGINS must list explicit origins; '*' is not allowed with credentials.")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
