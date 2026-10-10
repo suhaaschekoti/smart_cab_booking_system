@@ -13,41 +13,35 @@ def get_groq_client():
         return None
     return AsyncGroq(api_key=api_key)
 
-CHAT_MODELS = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "llama3-70b-8192",
-    "llama3-8b-8192",
-    "mixtral-8x7b-32768",
-    "gemma2-9b-it"
+PRODUCTION_MODELS = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
 ]
 
-async def resolve_active_model(client: AsyncGroq) -> str:
-    """Finds an active chat model while strictly ignoring audio/whisper models."""
-    try:
-        model_list = await client.models.list()
-        available_ids = {m.id for m in model_list.data}
-        logger.info(f"Available Groq models: {available_ids}")
+async def call_groq_completion(client: AsyncGroq, system_prompt: str, user_message: str):
+    """Invokes active text models with automatic fallback."""
+    last_error = None
+    for model_name in PRODUCTION_MODELS:
+        try:
+            logger.info(f"Calling Groq with model: {model_name}")
+            completion = await client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                max_tokens=1024
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            logger.warning(f"Model {model_name} failed: {e}. Trying fallback...")
+            last_error = e
+            continue
 
-        # 1. Match our vetted chat model list first
-        for candidate in CHAT_MODELS:
-            if candidate in available_ids:
-                return candidate
-
-        # 2. Filter out non-chat models (whisper, embeddings, etc.)
-        valid_chat_models = [
-            m_id for m_id in available_ids 
-            if not any(excluded in m_id.lower() for excluded in ["whisper", "embed", "tts", "guard"])
-        ]
-        
-        if valid_chat_models:
-            return valid_chat_models[0]
-            
-    except Exception as e:
-        logger.warning(f"Could not query Groq models dynamically: {e}")
-
-    # Fallback to standard chat endpoint
-    return "llama-3.3-70b-versatile"
+    raise last_error
 
 async def generate_tour_itinerary(
     user_prompt: str,
@@ -117,27 +111,13 @@ Candidate Attractions:
 """
 
     try:
-        chosen_model = await resolve_active_model(client)
-        logger.info(f"Using Groq model: {chosen_model}")
-
-        completion = await client.chat.completions.create(
-            model=chosen_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.3,
-            max_tokens=1024
-        )
-        content = completion.choices[0].message.content
+        content = await call_groq_completion(client, system_prompt, user_message)
         return json.loads(content)
-
     except Exception as e:
-        logger.error(f"Groq API call failed: {e}", exc_info=True)
+        logger.error(f"All Groq models failed: {e}", exc_info=True)
         return {
             "title": "Nearby Discovery",
-            "summary": f"Could not contact AI service: {str(e)[:80]}. Showing available local spots.",
+            "summary": "Could not contact AI service. Showing available local spots.",
             "total_estimated_time": f"{duration_hours} hours",
             "stops": available_attractions[:2],
             "tips": "Check backend logs for details."
