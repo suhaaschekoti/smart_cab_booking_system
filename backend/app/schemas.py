@@ -178,10 +178,13 @@ class RideRequestIn(BaseModel):
 
 
 class TourRequestIn(BaseModel):
-    attraction_id: int
+    attraction_id: int | None = None
     pickup_location: str
     pickup_lat: Decimal
     pickup_lng: Decimal
+    drop_location: str | None = None
+    drop_lat: Decimal | None = None
+    drop_lng: Decimal | None = None
     preferred_vehicle_type: str | None = None
 
 

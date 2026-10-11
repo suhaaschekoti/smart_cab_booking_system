@@ -192,44 +192,100 @@ def request_ride(
 # ------------------------------------------------------------
 # Booking: TOUR (ride to an attraction + guide fee)
 # ------------------------------------------------------------
-
-@router.post("/tour", response_model=schemas.TripOut, status_code=status.HTTP_201_CREATED)
+@router.post("/tour", response_model=schemas.TripOut)
 def request_tour(
     payload: schemas.TourRequestIn,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
     if not current_user.is_active:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your account is suspended")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive",
+        )
 
-    attraction = db.query(models.Attraction).filter(models.Attraction.attraction_id == payload.attraction_id).first()
-    if not attraction:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Attraction not found")
+    attraction = None
+
+    if payload.attraction_id is not None:
+        attraction = (
+            db.query(models.Attraction)
+            .filter(
+                models.Attraction.attraction_id == payload.attraction_id
+            )
+            .first()
+        )
+
+        if not attraction:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attraction not found",
+            )
+
+        drop_location = attraction.name
+        drop_lat = attraction.latitude
+        drop_lng = attraction.longitude
+
+    else:
+        if (
+            not payload.drop_location
+            or payload.drop_lat is None
+            or payload.drop_lng is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Destination name and coordinates are required",
+            )
+
+        drop_location = payload.drop_location
+        drop_lat = payload.drop_lat
+        drop_lng = payload.drop_lng
 
     now = _now_ist()
+
     distance, b = _price_ride(
-        db, float(payload.pickup_lat), float(payload.pickup_lng),
-        float(attraction.latitude), float(attraction.longitude),
-        payload.preferred_vehicle_type, is_tour=True, now=now,
+        db,
+        float(payload.pickup_lat),
+        float(payload.pickup_lng),
+        float(drop_lat),
+        float(drop_lng),
+        payload.preferred_vehicle_type,
+        is_tour=True,
+        now=now,
     )
 
-    driver, vehicle = find_driver_with_vehicle(db, float(payload.pickup_lat), float(payload.pickup_lng), payload.preferred_vehicle_type)
+    driver, vehicle = find_driver_with_vehicle(
+        db,
+        float(payload.pickup_lat),
+        float(payload.pickup_lng),
+        payload.preferred_vehicle_type,
+    )
+
     vtype = vehicle.vehicle_type if vehicle else payload.preferred_vehicle_type
+
     if vtype != b.get("vehicle_type"):
-        _, b = _price_ride(
-            db, float(payload.pickup_lat), float(payload.pickup_lng),
-            float(attraction.latitude), float(attraction.longitude),
-            vtype, is_tour=True, now=now,
+        distance, b = _price_ride(
+            db,
+            float(payload.pickup_lat),
+            float(payload.pickup_lng),
+            float(drop_lat),
+            float(drop_lng),
+            vtype,
+            is_tour=True,
+            now=now,
         )
 
     trip = models.Trip(
         user_id=current_user.user_id,
         driver_id=driver.driver_id if driver else None,
         vehicle_id=vehicle.vehicle_id if vehicle else None,
-        attraction_id=attraction.attraction_id,
+        attraction_id=attraction.attraction_id if attraction else None,
         service_type="TOUR",
-        pickup_location=payload.pickup_location, pickup_lat=payload.pickup_lat, pickup_lng=payload.pickup_lng,
-        drop_location=attraction.name, drop_lat=attraction.latitude, drop_lng=attraction.longitude,
+        pickup_location=payload.pickup_location,
+        pickup_lat=payload.pickup_lat,
+        pickup_lng=payload.pickup_lng,
+        drop_location=drop_location,
+        drop_lat=drop_lat,
+        drop_lng=drop_lng,
         distance_km=round(distance, 2),
         fare=b["fare"],
         surge_multiplier=b["surge_multiplier"],
@@ -238,9 +294,12 @@ def request_tour(
         peak_multiplier=b["peak_multiplier"],
         trip_status="REQUESTED",
     )
-    db.add(trip); db.commit(); db.refresh(trip)
-    return _get_trip(db, trip.trip_id)
 
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+
+    return _get_trip(db, trip.trip_id)
 
 # ------------------------------------------------------------
 # Booking: DRIVER_RENTAL (driver drives the passenger's own car)
