@@ -1,19 +1,32 @@
 import { api } from "./client";
 
-function authHeader(token) {
-  return { headers: { Authorization: `Bearer ${token}` } };
+const auth = (token) => ({
+  headers: { Authorization: `Bearer ${token}` },
+});
+
+export async function getEmergencyContacts(token) {
+  const { data } = await api.get("/emergency/contacts", auth(token));
+  return data;
 }
 
-export async function submitFeedback(token, tripId, rating, comments) {
+export async function addEmergencyContact(token, payload) {
   const { data } = await api.post(
-    `/feedback/${tripId}`,
-    { rating, comments: comments || null },
-    authHeader(token)
+    "/emergency/contacts",
+    payload,
+    auth(token),
   );
   return data;
 }
 
-export async function getFeedback(token, tripId) {
-  const { data } = await api.get(`/feedback/${tripId}`, authHeader(token));
+export async function updateEmergencyContact(token, id, payload) {
+  const { data } = await api.patch(
+    `/emergency/contacts/${id}`,
+    payload,
+    auth(token),
+  );
   return data;
+}
+
+export async function deleteEmergencyContact(token, id) {
+  await api.delete(`/emergency/contacts/${id}`, auth(token));
 }
