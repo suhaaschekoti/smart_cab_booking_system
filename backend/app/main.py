@@ -41,17 +41,22 @@ async def security_headers(request: Request, call_next):
     return resp
 
 
-_ORIGINS = [o.strip().rstrip("/") for o in settings.allowed_origins.split(",") if o.strip()]
-if "*" in _ORIGINS:
-    raise RuntimeError("ALLOWED_ORIGINS must list explicit origins; '*' is not allowed with credentials.")
+_ORIGINS = [
+    o.strip().rstrip("/")
+    for o in settings.allowed_origins.split(",")
+    if o.strip()
+]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Automatically allow the configured production frontend.
+frontend_origin = settings.frontend_url.strip().rstrip("/")
+
+if frontend_origin and frontend_origin not in _ORIGINS:
+    _ORIGINS.append(frontend_origin)
+
+if "*" in _ORIGINS:
+    raise RuntimeError(
+        "ALLOWED_ORIGINS must list explicit origins; '*' is not allowed with credentials."
+    )
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(trips.router, prefix="/trips", tags=["trips"])
