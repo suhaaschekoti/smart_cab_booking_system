@@ -6,7 +6,7 @@ import StatusBadge from "../components/StatusBadge";
 import ServiceTypeBadge from "../components/ServiceTypeBadge";
 import { motion, AnimatePresence } from "motion/react";
 import { Page, Card, Counter } from "../components/motion";
-
+import { formatIST } from "../api/client";
 const TABS = ["Overview", "Users", "Drivers", "Trips", "Payments", "Alerts", "Attractions"];
 
 export default function AdminDashboard() {
@@ -82,14 +82,14 @@ export default function AdminDashboard() {
         {tab === "Trips" && (
           <Card><h2 className="card-title">All trips ({trips.length})</h2>
             <table className="admin-table"><thead><tr><th>#</th><th>Type</th><th>Passenger</th><th>Driver</th><th>Route</th><th>Km</th><th>Fare</th><th>Surge</th><th>Status</th><th>Created</th></tr></thead>
-              <tbody>{trips.map((tr) => <tr key={tr.trip_id}><td>{tr.trip_id}</td><td><ServiceTypeBadge type={tr.service_type} /></td><td>{tr.passenger_name}</td><td>{tr.driver_name || "—"}</td><td className="cell-route">{tr.pickup_location.split(",")[0]} → {tr.drop_location.split(",")[0]}</td><td>{tr.distance_km}</td><td>₹{tr.fare}</td><td>{Number(tr.surge_multiplier) > 1 ? `×${Number(tr.surge_multiplier).toFixed(2)}` : "—"}{tr.night_surcharge && " 🌙"}</td><td><StatusBadge status={tr.trip_status} /></td><td className="cell-sub">{new Date(tr.created_at).toLocaleString()}</td></tr>)}</tbody></table>
+              <tbody>{trips.map((tr) => <tr key={tr.trip_id}><td>{tr.trip_id}</td><td><ServiceTypeBadge type={tr.service_type} /></td><td>{tr.passenger_name}</td><td>{tr.driver_name || "—"}</td><td className="cell-route">{tr.pickup_location.split(",")[0]} → {tr.drop_location.split(",")[0]}</td><td>{tr.distance_km}</td><td>₹{tr.fare}</td><td>{Number(tr.surge_multiplier) > 1 ? `×${Number(tr.surge_multiplier).toFixed(2)}` : "—"}{tr.night_surcharge && " 🌙"}</td><td><StatusBadge status={tr.trip_status} /></td><td className="cell-sub">{formatIST(tr.created_at)}</td></tr>)}</tbody></table>
           </Card>
         )}
 
         {tab === "Payments" && (
           <Card><h2 className="card-title">Payments ({payments.length})</h2>
             <table className="admin-table"><thead><tr><th>#</th><th>Trip</th><th>Amount</th><th>Discount</th><th>Points used</th><th>Mode</th><th>Status</th><th>Time</th></tr></thead>
-              <tbody>{payments.map((p) => <tr key={p.payment_id}><td>{p.payment_id}</td><td>#{p.trip_id}</td><td>₹{p.amount}</td><td>{Number(p.discount_applied) > 0 ? `₹${p.discount_applied}` : "—"}</td><td>{p.points_redeemed || "—"}</td><td>{p.payment_mode}</td><td><span className="paid-badge">{p.payment_status}</span></td><td className="cell-sub">{new Date(p.payment_time).toLocaleString()}</td></tr>)}</tbody></table>
+              <tbody>{payments.map((p) => <tr key={p.payment_id}><td>{p.payment_id}</td><td>#{p.trip_id}</td><td>₹{p.amount}</td><td>{Number(p.discount_applied) > 0 ? `₹${p.discount_applied}` : "—"}</td><td>{p.points_redeemed || "—"}</td><td>{p.payment_mode}</td><td><span className="paid-badge">{p.payment_status}</span></td><td className="cell-sub">{formatIST(p.payment_time)}</td></tr>)}</tbody></table>
           </Card>
         )}
 
@@ -97,7 +97,7 @@ export default function AdminDashboard() {
           <Card><h2 className="card-title">SOS alerts ({alerts.length})</h2>
             {alerts.length === 0 ? <p className="empty-state">No alerts.</p> : (
               <table className="admin-table"><thead><tr><th>#</th><th>Trip</th><th>User</th><th>Time</th><th>Location</th><th>Notified</th><th>Status</th><th></th></tr></thead>
-                <tbody>{alerts.map((a) => <tr key={a.alert_id} className={a.alert_status === "SENT" ? "row-alert" : ""}><td>{a.alert_id}</td><td>#{a.trip_id}</td><td>#{a.user_id}</td><td className="cell-sub">{new Date(a.alert_time).toLocaleString()}</td><td>{a.alert_lat ? <a href={`https://www.google.com/maps?q=${a.alert_lat},${a.alert_lng}`} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>map ↗</a> : "—"}</td><td>{a.notifications.filter((n) => n.delivery_status === "SENT").length}/{a.notifications.length}</td><td><span className={`status-badge ${a.alert_status === "ACKNOWLEDGED" ? "status-completed" : "status-cancelled"}`}>{a.alert_status}</span></td><td>{a.alert_status === "SENT" && <button className="pay-btn" style={{ marginTop: 0 }} onClick={() => act(() => A.acknowledgeAlert(t, a.alert_id))}>Acknowledge</button>}</td></tr>)}</tbody></table>
+                <tbody>{alerts.map((a) => <tr key={a.alert_id} className={a.alert_status === "SENT" ? "row-alert" : ""}><td>{a.alert_id}</td><td>#{a.trip_id}</td><td>#{a.user_id}</td><td className="cell-sub">{formatIST(a.alert_time)}</td><td>{a.alert_lat ? <a href={`https://www.google.com/maps?q=${a.alert_lat},${a.alert_lng}`} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>map ↗</a> : "—"}</td><td>{a.notifications.filter((n) => n.delivery_status === "SENT").length}/{a.notifications.length}</td><td><span className={`status-badge ${a.alert_status === "ACKNOWLEDGED" ? "status-completed" : "status-cancelled"}`}>{a.alert_status}</span></td><td>{a.alert_status === "SENT" && <button className="pay-btn" style={{ marginTop: 0 }} onClick={() => act(() => A.acknowledgeAlert(t, a.alert_id))}>Acknowledge</button>}</td></tr>)}</tbody></table>
             )}
           </Card>
         )}

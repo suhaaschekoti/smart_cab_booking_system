@@ -15,6 +15,7 @@ import ServiceTypeBadge from "../components/ServiceTypeBadge";
 import SOSButton from "../components/SOSButton";
 import Segmented from "../components/Segmented";
 import { Page, Card, Reveal, Button, Row } from "../components/motion";
+import { formatIST } from "../api/client";
 
 const VT = ["Hatchback", "Sedan", "SUV"], FT = ["Petrol", "Diesel", "EV", "CNG"];
 const ACTIVE = ["REQUESTED", "ACCEPTED", "ONGOING"];
@@ -163,7 +164,7 @@ export default function PassengerDashboard() {
                   <Row key={trip.trip_id} className="trip-list-item">
                     <div>
                       <div className="trip-list-route"><ServiceTypeBadge type={trip.service_type} />{trip.pickup_location.split(",")[0]} → {trip.drop_location.split(",")[0]}</div>
-                      <div className="trip-list-meta">{new Date(trip.created_at).toLocaleString()}, ₹{trip.fare}{trip.driver_name && `, ${trip.driver_name}`}</div>
+                      <div className="trip-list-meta">{formatIST(trip.created_at)}, ₹{trip.fare}{trip.driver_name && `, ${trip.driver_name}`}</div>
                     </div>
                     <div className="trip-list-actions">
                       <StatusBadge status={trip.trip_status} />

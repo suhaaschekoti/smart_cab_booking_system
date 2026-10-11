@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { makePayment } from "../api/payments";
 import { getMyRewards } from "../api/rewards";
 import { Modal, Button } from "./motion";
+import { formatIST } from "../api/client";
 
 const MODES = [{ key: "UPI", label: "UPI", icon: "⚡" }, { key: "CARD", label: "Card", icon: "💳" }, { key: "WALLET", label: "Wallet", icon: "👛" }, { key: "CASH", label: "Cash", icon: "💵" }];
 const Row = ({ k, v, total }) => <div className={`receipt-row ${total ? "receipt-total" : ""}`}><span>{k}</span><span>{v}</span></div>;
@@ -43,7 +44,7 @@ export default function PaymentModal({ trip, token, onPaid, onClose }) {
               {Number(receipt.discount_applied) > 0 && <Row k="Reward discount" v={`− ₹${Number(receipt.discount_applied).toFixed(2)}`} />}
               <Row k="Amount paid" v={`₹${Number(receipt.amount).toFixed(2)}`} total />
               <Row k="Method" v={receipt.payment_mode} />
-              <Row k="Time" v={new Date(receipt.payment_time).toLocaleString()} />
+              <Row k="Time" v={formatIST(payment.payment_time)} />
               <p className="receipt-reward">You earned 10 reward points</p>
             </div>
             <Button className="btn-block" onClick={onClose}>Done</Button>

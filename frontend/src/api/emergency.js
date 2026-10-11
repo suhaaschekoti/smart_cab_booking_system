@@ -37,8 +37,8 @@ export async function deleteContact(token, id) {
 export async function triggerSOS(
   token,
   tripId,
-  currentLat = null,
-  currentLng = null
+  currentLat,
+  currentLng
 ) {
   const { data } = await api.post(
     "/emergency/sos",
@@ -49,6 +49,7 @@ export async function triggerSOS(
     },
     auth(token)
   );
+
   return data;
 }
 export async function getMyAlerts(token) {
