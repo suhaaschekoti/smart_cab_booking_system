@@ -57,10 +57,10 @@ export default function TourGuide() {
     setSelected(destinationObj);
 
     // If pickup isn't set yet, seed it near the destination or with current coords
-    // if (!pickup) {
-    //   setPickup({ lat, lng });
-    //   setPickupLocation(stop.name);
-    // }
+    if (!pickup) {
+      setPickup({ lat, lng });
+      setPickupLocation(stop.name);
+    }
 
     // Scroll smoothly to the booking section
     setTimeout(() => {
