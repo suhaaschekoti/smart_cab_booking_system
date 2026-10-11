@@ -41,6 +41,37 @@ def delete_contact(contact_id: int, db: Session = Depends(get_db), current_user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Contact not found")
     db.delete(c); db.commit()
 
+@router.patch(
+    "/contacts/{contact_id}",
+    response_model=schemas.EmergencyContactOut,
+)
+def update_contact(
+    contact_id: int,
+    payload: schemas.EmergencyContactIn,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    contact = (
+        db.query(models.EmergencyContact)
+        .filter(
+            models.EmergencyContact.contact_id == contact_id,
+            models.EmergencyContact.user_id == current_user.user_id,
+        )
+        .first()
+    )
+
+    if not contact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contact not found",
+        )
+
+    for field, value in payload.model_dump().items():
+        setattr(contact, field, value)
+
+    db.commit()
+    db.refresh(contact)
+    return contact
 
 # ------------------------------------------------------------
 # SOS
